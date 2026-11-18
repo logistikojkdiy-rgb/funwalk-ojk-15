@@ -1,0 +1,18 @@
+{
+  "name": "Fun Walk 3D - HUT Ke-15 OJK DIY",
+  "short_name": "FunWalk OJK15",
+  "description": "Peta Rute 3D Interaktif & Live GPS Tracker Fun Walk 3,1 Km HUT Ke-15 OJK D.I. Yogyakarta",
+  "start_url": ".",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0B1320",
+  "theme_color": "#BA1313",
+  "icons": [
+    {
+      "src": "logo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

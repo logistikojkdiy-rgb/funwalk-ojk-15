@@ -1,0 +1,1202 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="theme-color" content="#0F141E" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <title>Fun Walk 3,1 km — HUT OJK Ke-15 DIY</title>
+  <link rel="manifest" href="manifest.json" />
+  <link rel="icon" type="image/png" href="logo.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet" />
+  <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+  <style>
+    :root {
+      --bg: #0F141E;
+      --surface: #161D2B;
+      --surface-2: #1E2738;
+      --border: rgba(255, 255, 255, 0.09);
+      --ink: #F8FAFC;
+      --ink-2: #CBD5E1;
+      --muted: #8B98AC;
+      --strava: #FC4C02;
+      --ojk: #BA1313;
+      --gold: #E2A958;
+      --gps: #0EA5E9;
+      --ok: #16A34A;
+      --safe-top: env(safe-area-inset-top, 0px);
+      --safe-bot: env(safe-area-inset-bottom, 0px);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+    html, body { overscroll-behavior: none; touch-action: pan-x pan-y; }
+    html, body {
+      width: 100%; height: 100%; overflow: hidden;
+      background: var(--bg); color: var(--ink);
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      font-weight: 400;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .app {
+      position: relative;
+      width: 100%; height: 100dvh;
+      overflow: hidden;
+    }
+
+    /* Fullscreen 3D Map */
+    #map3d, #fallbackCanvas {
+      position: absolute; inset: 0; width: 100%; height: 100%;
+    }
+    #fallbackCanvas { display: none; z-index: 2; }
+    #confettiCanvas { position: fixed; inset: 0; z-index: 150; pointer-events: none; }
+    .maplibregl-ctrl-bottom-left, .maplibregl-ctrl-bottom-right { display: none !important; }
+
+    /* =========================================================================
+       1. SPLASH SCREEN
+    ========================================================================= */
+    #splash {
+      position: fixed; inset: 0; z-index: 200;
+      background: #0F141E;
+      display: flex; flex-direction: column; align-items: center; justify-content: space-between;
+      padding: calc(48px + var(--safe-top)) 24px calc(36px + var(--safe-bot));
+      transition: opacity 0.45s ease, visibility 0.45s ease;
+    }
+    #splash.hidden { opacity: 0; visibility: hidden; pointer-events: none; }
+
+    .splash-tag {
+      font-size: 11px; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase;
+      color: var(--gold); padding: 6px 14px; border-radius: 999px;
+      background: var(--surface); border: 1px solid var(--border);
+    }
+    .splash-center {
+      display: flex; flex-direction: column; align-items: center; text-align: center; max-width: 320px;
+    }
+    .splash-logo {
+      width: 116px; height: 116px; border-radius: 26px; background: #FFFFFF;
+      display: grid; place-items: center; margin-bottom: 24px;
+      box-shadow: 0 20px 44px rgba(0,0,0,0.45);
+    }
+    .splash-logo img { width: 92px; height: 92px; object-fit: contain; }
+    .splash-title { font-size: 24px; font-weight: 600; letter-spacing: -0.02em; line-height: 1.25; }
+    .splash-sub { font-size: 13px; color: var(--muted); margin-top: 8px; line-height: 1.5; }
+    .splash-btn {
+      width: 100%; max-width: 320px; padding: 14px 20px; border: 0; border-radius: 14px;
+      background: var(--strava); color: #fff; font-family: inherit; font-size: 14px; font-weight: 600;
+      cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px;
+    }
+
+    /* =========================================================================
+       2. TOP FLOATING BAR (GLASS #1)
+    ========================================================================= */
+    .top-bar {
+      position: absolute; top: calc(12px + var(--safe-top)); left: 12px; right: 12px; z-index: 20;
+      display: flex; align-items: center; justify-content: space-between; gap: 8px;
+      pointer-events: none;
+    }
+    .brand-chip {
+      pointer-events: auto;
+      display: flex; align-items: center; gap: 10px;
+      padding: 6px 14px 6px 6px; border-radius: 999px;
+      background: rgba(15, 20, 30, 0.78);
+      backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+      border: 1px solid var(--border);
+    }
+    .brand-chip img { width: 28px; height: 28px; border-radius: 50%; background: #fff; padding: 2px; object-fit: contain; }
+    .brand-chip .t1 { font-size: 12.5px; font-weight: 600; line-height: 1.15; }
+    .brand-chip .t2 { font-size: 10.5px; color: var(--muted); }
+
+    .top-icons { pointer-events: auto; display: flex; gap: 6px; }
+    .ico-btn {
+      width: 38px; height: 38px; border-radius: 999px;
+      background: rgba(15, 20, 30, 0.78);
+      backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+      border: 1px solid var(--border); color: var(--ink);
+      display: grid; place-items: center; cursor: pointer;
+    }
+    .ico-btn.active { background: var(--strava); border-color: var(--strava); color: #fff; }
+
+    /* Toast */
+    #toast {
+      position: absolute; top: calc(62px + var(--safe-top)); left: 12px; right: 12px; z-index: 25;
+      background: var(--surface); border: 1px solid var(--border); border-left: 3px solid var(--strava);
+      border-radius: 12px; padding: 10px 14px;
+      display: flex; align-items: center; gap: 10px;
+      box-shadow: 0 12px 28px rgba(0,0,0,0.4);
+      transform: translateY(-16px); opacity: 0; pointer-events: none;
+      transition: all 0.25s ease;
+    }
+    #toast.show { transform: translateY(0); opacity: 1; }
+    .toast-title { font-size: 12.5px; font-weight: 600; color: var(--ink); }
+    .toast-sub { font-size: 11.5px; color: var(--muted); margin-top: 2px; }
+
+    /* =========================================================================
+       3. STRAVA-STYLE COLLAPSIBLE BOTTOM SHEET
+    ========================================================================= */
+    .sheet {
+      position: absolute; left: 0; right: 0; bottom: 0; z-index: 30;
+      background: var(--surface);
+      border-top: 1px solid var(--border);
+      border-radius: 22px 22px 0 0;
+      padding: 8px 16px calc(14px + var(--safe-bot));
+      box-shadow: 0 -12px 36px rgba(0,0,0,0.45);
+      transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+    @media (min-width: 720px) {
+      .sheet {
+        left: 16px; bottom: 16px; right: auto; width: 390px;
+        border-radius: 22px; border: 1px solid var(--border);
+      }
+    }
+
+    .handle-row {
+      display: flex; justify-content: center; padding: 2px 0 10px; cursor: pointer;
+    }
+    .handle-bar { width: 36px; height: 4px; border-radius: 4px; background: rgba(255,255,255,0.18); }
+
+    /* Compact Progress Bar (Always Visible even when detail is hidden!) */
+    .compact-progress {
+      margin-bottom: 12px;
+    }
+    .prog-meta {
+      display: flex; justify-content: space-between; align-items: baseline;
+      margin-bottom: 6px; font-size: 12px; color: var(--muted);
+    }
+    .prog-meta strong { font-size: 14px; font-weight: 600; color: var(--ink); font-variant-numeric: tabular-nums; }
+    .prog-track {
+      width: 100%; height: 5px; border-radius: 999px; background: var(--surface-2); overflow: hidden;
+    }
+    .prog-fill {
+      height: 100%; width: 0%; background: var(--strava); border-radius: 999px;
+      transition: width 0.2s linear;
+    }
+
+    /* Compact Control Bar */
+    .compact-controls {
+      display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    }
+    .btn-pill {
+      height: 44px; padding: 0 16px; border-radius: 999px;
+      border: 1px solid var(--border); background: var(--surface-2); color: var(--ink);
+      font-family: inherit; font-size: 13px; font-weight: 500;
+      cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+    }
+    .btn-pill.primary {
+      flex: 1; background: var(--strava); border-color: var(--strava); color: #fff; font-weight: 600;
+    }
+    .btn-pill.gps-active {
+      background: var(--ok); border-color: var(--ok); color: #fff;
+    }
+
+    /* Expandable Detail Area (Hidden by Default!) */
+    .sheet-detail {
+      display: none;
+      margin-top: 14px;
+      padding-top: 14px;
+      border-top: 1px solid var(--border);
+      max-height: 54dvh;
+      overflow-y: auto;
+    }
+    .sheet.open .sheet-detail { display: block; }
+
+    .detail-tabs {
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-bottom: 14px;
+      background: var(--bg); padding: 4px; border-radius: 12px;
+    }
+    .dtab {
+      padding: 8px; border: 0; border-radius: 9px; background: transparent; color: var(--muted);
+      font-family: inherit; font-size: 12px; font-weight: 500; cursor: pointer;
+    }
+    .dtab.active { background: var(--surface-2); color: var(--ink); font-weight: 600; }
+
+    .dpane { display: none; }
+    .dpane.active { display: block; }
+
+    /* Clean Strava-like Metrics Grid (No Heavy Bold!) */
+    .metrics-grid {
+      display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 12px;
+    }
+    .m-card {
+      background: var(--bg); border: 1px solid var(--border); border-radius: 14px; padding: 12px;
+    }
+    .m-card .lbl { font-size: 11px; color: var(--muted); }
+    .m-card .val { font-size: 22px; font-weight: 500; font-variant-numeric: tabular-nums; margin-top: 3px; }
+    .m-card .val small { font-size: 12px; color: var(--muted); }
+
+    .guide-line {
+      background: var(--bg); border: 1px solid var(--border); border-radius: 12px;
+      padding: 11px 12px; font-size: 12.5px; color: var(--ink-2); line-height: 1.45;
+      margin-bottom: 10px;
+    }
+    .guide-line span { display: block; font-size: 10.5px; color: var(--gold); margin-bottom: 3px; font-weight: 500; }
+
+    .range-wrap { display: flex; align-items: center; gap: 10px; font-size: 11.5px; color: var(--muted); }
+    .range-wrap input { flex: 1; accent-color: var(--strava); }
+
+    /* Checkpoints List */
+    .cp-list { display: flex; flex-direction: column; gap: 8px; }
+    .cp-row {
+      display: flex; align-items: center; gap: 12px; padding: 10px 12px;
+      background: var(--bg); border: 1px solid var(--border); border-radius: 12px; cursor: pointer;
+    }
+    .cp-row.done { border-color: rgba(22, 163, 74, 0.45); }
+    .cp-dot {
+      width: 26px; height: 26px; border-radius: 50%; flex-shrink: 0;
+      background: var(--surface-2); border: 1px solid var(--border);
+      display: grid; place-items: center; font-size: 11px; font-weight: 600; color: var(--gold);
+    }
+    .cp-row.done .cp-dot { background: var(--ok); border-color: var(--ok); color: #fff; }
+    .cp-name { font-size: 12.5px; font-weight: 500; color: var(--ink); }
+    .cp-sub { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+    /* Selfie Studio */
+    .selfie-box { display: flex; flex-direction: column; gap: 10px; }
+    .selfie-frame {
+      width: 100%; aspect-ratio: 4 / 5; background: #090D14; border-radius: 14px;
+      border: 1px solid var(--border); overflow: hidden;
+    }
+    #cameraVideo { display: none; }
+    #selfieCanvas { width: 100%; height: 100%; object-fit: contain; display: block; }
+    .row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .input-clean {
+      width: 100%; padding: 10px 12px; border-radius: 10px; background: var(--bg);
+      border: 1px solid var(--border); color: var(--ink); font-family: inherit; font-size: 12.5px;
+    }
+
+    /* Clean Map Pins (No Giant Overlapping Black Boxes!) */
+    .pin-dot {
+      width: 24px; height: 24px; border-radius: 50%;
+      background: var(--surface); border: 2px solid var(--gold); color: #fff;
+      font-size: 11px; font-weight: 600; display: grid; place-items: center;
+      box-shadow: 0 3px 10px rgba(0,0,0,0.45); cursor: pointer;
+    }
+    .pin-dot.start {
+      width: 28px; height: 28px; background: var(--ojk); border-color: #fff;
+    }
+    .user-dot {
+      width: 18px; height: 18px; border-radius: 50%;
+      background: var(--gps); border: 3px solid #fff;
+      box-shadow: 0 0 0 6px rgba(14, 165, 233, 0.3);
+    }
+  </style>
+</head>
+<body>
+  <!-- 1. SPLASHSCREEN -->
+  <section id="splash" style="background:#000;">
+    <video id="splashVideo" src="splash.mp4" autoplay muted loop playsinline style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:0;"></video>
+    <div style="position:absolute;inset:0;background:linear-gradient(180deg,rgba(11,14,20,0.35) 0%,rgba(11,14,20,0.12) 50%,rgba(11,14,20,0.85) 100%);z-index:1;pointer-events:none;"></div>
+    <div class="splash-tag" style="position:relative;z-index:2;text-align:center;line-height:1.35;">
+      <div>HUT KE - 15 OJK</div>
+      <div style="font-size:10px;font-weight:400;letter-spacing:0.3px;text-transform:none;color:rgba(255,255,255,0.82);margin-top:2px;">Kantor OJK Daerah Istimewa Yogyakarta</div>
+    </div>
+    <div style="flex:1;"></div>
+    <button class="splash-btn" onclick="closeSplash()" style="position:relative;z-index:2;">
+      <span>Buka Peta Rute</span>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+    </button>
+  </section>
+
+  <canvas id="confettiCanvas"></canvas>
+
+  <!-- 2. FULLSCREEN 3D MAP APP -->
+  <div class="app">
+    <div id="map3d"></div>
+    <canvas id="fallbackCanvas"></canvas>
+
+    <!-- Top Floating Bar -->
+    <header class="top-bar">
+      <div class="brand-chip">
+        <img src="logo.png" alt="OJK 15" />
+        <div>
+          <div class="t1">Fun Walk OJK 15</div>
+          <div class="t2" id="topStatus">3,10 km • Siap</div>
+        </div>
+      </div>
+      <div class="top-icons">
+        <button class="ico-btn" id="btnTheme" onclick="toggleMapTheme()" title="Mode Peta Siang/Malam">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
+        </button>
+        <button class="ico-btn active" id="btnFollow" onclick="toggleFollow()" title="Ikuti Lokasi">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>
+        </button>
+        <button class="ico-btn" onclick="resetCam()" title="Reset Sudut 3D">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- Toast Notification -->
+    <div id="toast">
+      <div>
+        <div class="toast-title" id="toastTitle">Pos Terlewati</div>
+        <div class="toast-sub" id="toastSub">Lanjutkan perjalanan</div>
+      </div>
+    </div>
+
+    <!-- Collapsible Bottom Sheet (Compact Default + Expandable Detail!) -->
+    <section class="sheet" id="sheet">
+      <div class="handle-row" onclick="toggleSheet()">
+        <div class="handle-bar"></div>
+      </div>
+
+      <!-- Compact Progress Always Visible -->
+      <div class="compact-progress">
+        <div class="prog-meta">
+          <span><strong id="cDist">0,00</strong> / 3,10 km</span>
+          <span><strong id="cTime">00:00</strong> • <span id="cPct">0%</span></span>
+        </div>
+        <div class="prog-track"><div class="prog-fill" id="progFill"></div></div>
+      </div>
+
+      <!-- Compact Action Bar -->
+      <div class="compact-controls">
+        <button class="btn-pill primary" id="btnGps" onclick="toggleGPS()" title="Aktifkan GPS HP">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3"/><path d="M12 19v3"/><path d="M2 12h3"/><path d="M19 12h3"/></svg>
+          <span id="lblGps">Mulai GPS</span>
+        </button>
+
+        <button class="btn-pill" id="btnSim" onclick="toggleSim()" title="Pratinjau Rute">
+          <svg id="icoPlay" width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><polygon points="6 4 20 12 6 20 6 4"/></svg>
+          <svg id="icoPause" style="display:none" width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+          <span id="lblSim">Simulasi</span>
+        </button>
+
+        <button class="btn-pill" onclick="openDetailTab('selfie')" title="Selfie Finisher">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></svg>
+        </button>
+
+        <button class="btn-pill" id="btnExpand" onclick="toggleSheet()" title="Buka/Tutup Detail">
+          <svg id="icoChev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m18 15-6-6-6 6"/></svg>
+        </button>
+      </div>
+
+      <!-- Hidden Expandable Detail Panel -->
+      <div class="sheet-detail">
+        <div class="detail-tabs">
+          <button class="dtab active" id="dtStats" onclick="switchDetailTab('stats')">Catatan</button>
+          <button class="dtab" id="dtPos" onclick="switchDetailTab('pos')">Pos Rute</button>
+          <button class="dtab" id="dtSelfie" onclick="switchDetailTab('selfie')">Selfie Watermark</button>
+        </div>
+
+        <!-- TAB 1: STATS -->
+        <div class="dpane active" id="paneStats">
+          <div class="guide-line">
+            <span id="guideTitle">PANDUAN RUTE</span>
+            <div id="guideBody">Kumpul di Kantor OJK Jl. Jend. Sudirman No. 22. Tekan GPS saat mulai berjalan atau Simulasi untuk melihat jalur.</div>
+          </div>
+
+          <div class="metrics-grid">
+            <div class="m-card"><div class="lbl">Langkah Kaki</div><div class="val" id="mSteps">0</div></div>
+            <div class="m-card"><div class="lbl">Pace Rata-rata</div><div class="val" id="mPace">13'52"<small>/km</small></div></div>
+            <div class="m-card"><div class="lbl">Waktu Tempuh</div><div class="val" id="mTime">00:00</div></div>
+            <div class="m-card"><div class="lbl">Kalori Terbakar</div><div class="val" id="mKcal">0 <small>kcal</small></div></div>
+          </div>
+
+          <div class="range-wrap">
+            <span>Geser Rute</span>
+            <input type="range" min="0" max="1000" value="0" id="scrub" oninput="scrubTo(this.value)" />
+            <button onclick="resetSession()" style="background:none;border:0;color:var(--gold);font-size:11.5px;cursor:pointer;">Reset</button>
+          </div>
+        </div>
+
+        <!-- TAB 2: CHECKPOINTS -->
+        <div class="dpane" id="panePos">
+          <div class="cp-list" id="cpList"></div>
+          <a href="https://maps.app.goo.gl/Wd9RtfShE52LTj9LA" target="_blank" rel="noopener"
+             style="display:block;text-align:center;margin-top:10px;padding:10px;border-radius:10px;background:var(--bg);border:1px solid var(--border);color:var(--gold);font-size:12px;text-decoration:none;">
+            Buka Rute di Google Maps
+          </a>
+        </div>
+
+        <!-- TAB 3: SELFIE WATERMARK -->
+        <div class="dpane" id="paneSelfie">
+          <div class="selfie-box">
+            <div class="row-2">
+              <button class="btn-pill primary" onclick="document.getElementById('camIn').click()">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                <span>Buka Kamera</span>
+              </button>
+              <button class="btn-pill" onclick="document.getElementById('fileIn').click()">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+                <span>Pilih Galeri</span>
+              </button>
+            </div>
+            <input type="file" id="camIn" accept="image/*" capture="user" style="display:none" onchange="onPhotoPick(event)" />
+            <input type="file" id="fileIn" accept="image/*" style="display:none" onchange="onPhotoPick(event)" />
+            <div style="display:flex;gap:6px;overflow-x:auto;padding:2px 0;" id="tplChips">
+              <button class="btn-pill primary" data-tpl="0" onclick="setWmTemplate(0)" style="flex:0 0 auto;padding:7px 12px;font-size:12px;">Glass + Rute</button>
+              <button class="btn-pill" data-tpl="1" onclick="setWmTemplate(1)" style="flex:0 0 auto;padding:7px 12px;font-size:12px;">Minimalis</button>
+              <button class="btn-pill" data-tpl="2" onclick="setWmTemplate(2)" style="flex:0 0 auto;padding:7px 12px;font-size:12px;">OJK Heritage</button>
+              <button class="btn-pill" data-tpl="3" onclick="setWmTemplate(3)" style="flex:0 0 auto;padding:7px 12px;font-size:12px;">Bingkai</button>
+            </div>
+            <input type="text" id="userName" class="input-clean" placeholder="Nama Anda (opsional)" oninput="drawSelfie()" />
+            <div class="selfie-frame">
+              <video id="cameraVideo" autoplay playsinline muted></video>
+              <canvas id="selfieCanvas" width="1080" height="1920"></canvas>
+            </div>
+            <div class="row-2">
+              <button class="btn-pill primary" onclick="downloadSelfie()">Unduh PNG</button>
+              <button class="btn-pill" onclick="shareSelfie()">Bagikan</button>
+            </div>
+            <div id="selfieToast" style="display:none;text-align:center;font-size:12px;color:var(--ok);padding:4px 0;"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <!-- FULLSCREEN NATIVE CAMERA OVERLAY -->
+  <div id="camModal" style="display:none;position:fixed;inset:0;z-index:950;background:#000;flex-direction:column;justify-content:space-between;">
+    <div style="display:flex;align-items:center;gap:10px;padding:14px 16px;background:linear-gradient(180deg,rgba(0,0,0,0.75),transparent);z-index:2;">
+      <button onclick="stopCamera()" aria-label="Tutup Kamera" style="width:40px;height:40px;border-radius:999px;border:1px solid rgba(255,255,255,0.22);background:rgba(20,24,32,0.7);color:#fff;display:grid;place-items:center;cursor:pointer;flex:0 0 auto;">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+      </button>
+      <div id="camTplChips" style="display:flex;gap:6px;overflow-x:auto;flex:1;">
+        <button class="btn-pill primary" data-tpl="0" onclick="setWmTemplate(0)" style="flex:0 0 auto;padding:7px 12px;font-size:12px;">Glass + Rute</button>
+        <button class="btn-pill" data-tpl="1" onclick="setWmTemplate(1)" style="flex:0 0 auto;padding:7px 12px;font-size:12px;">Minimalis</button>
+        <button class="btn-pill" data-tpl="2" onclick="setWmTemplate(2)" style="flex:0 0 auto;padding:7px 12px;font-size:12px;">OJK Heritage</button>
+        <button class="btn-pill" data-tpl="3" onclick="setWmTemplate(3)" style="flex:0 0 auto;padding:7px 12px;font-size:12px;">Bingkai</button>
+      </div>
+    </div>
+    <div style="flex:1;position:relative;display:grid;place-items:center;overflow:hidden;">
+      <canvas id="camLiveCanvas" width="1080" height="1920" style="width:100%;height:100%;object-fit:cover;"></canvas>
+    </div>
+    <div style="display:flex;align-items:center;justify-content:space-around;padding:16px 20px calc(24px + env(safe-area-inset-bottom));background:linear-gradient(0deg,rgba(0,0,0,0.88),transparent);z-index:2;">
+      <button onclick="stopCamera();document.getElementById('fileIn').click()" aria-label="Pilih Foto" style="width:46px;height:46px;border-radius:999px;border:1px solid rgba(255,255,255,0.25);background:rgba(255,255,255,0.12);color:#fff;display:grid;place-items:center;cursor:pointer;">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+      </button>
+      <button id="btnWide" onclick="toggleWide()" aria-label="Mode Wide" style="height:40px;padding:0 12px;border-radius:999px;border:1px solid rgba(255,255,255,0.28);background:rgba(255,255,255,0.12);color:#fff;font-size:12px;font-weight:500;cursor:pointer;">1x</button>
+      <button onclick="snapCamera()" aria-label="Jepret Foto" style="width:74px;height:74px;border-radius:999px;border:4px solid #fff;background:transparent;padding:5px;cursor:pointer;display:grid;place-items:center;">
+        <span style="width:100%;height:100%;border-radius:999px;background:#fff;display:block;"></span>
+      </button>
+      <button onclick="flipCamera()" aria-label="Putar Kamera" style="width:46px;height:46px;border-radius:999px;border:1px solid rgba(255,255,255,0.25);background:rgba(255,255,255,0.12);color:#fff;display:grid;place-items:center;cursor:pointer;">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M20 7h-4V3M4 17h4v4"/><path d="M20 7a9 9 0 0 0-15.5-2M4 17a9 9 0 0 0 15.5 2"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <script>
+    // =========================================================================
+    // 1. EXACT CALIBRATED YOGYAKARTA ROUTE (OJK -> Tugu -> Mangkubumi -> Margo Utomo 3b -> Kotabaru -> Gramedia -> OJK)
+    // =========================================================================
+    const ROUTE_COORDS = [
+      [110.368827, -7.782932], [110.367936, -7.782906], [110.367070, -7.782880],
+      [110.366939, -7.783920], [110.366808, -7.785090], [110.366703, -7.786130],
+      [110.366572, -7.787300], [110.366414, -7.788600], [110.366257, -7.789822],
+      [110.366755, -7.789926], [110.367542, -7.790004], [110.368408, -7.790056],
+      [110.368932, -7.790030], [110.369378, -7.789926], [110.369903, -7.789770],
+      [110.370506, -7.789432], [110.371214, -7.788964], [110.372001, -7.788470],
+      [110.372657, -7.788080], [110.373182, -7.787794], [110.373520, -7.787660],
+      [110.373560, -7.787118], [110.373820, -7.786910], [110.374178, -7.786850],
+      [110.374650, -7.786750], [110.374782, -7.785870], [110.374913, -7.785220],
+      [110.375044, -7.784310], [110.375175, -7.783530], [110.375280, -7.782932],
+      [110.374231, -7.782932], [110.373182, -7.782932], [110.372132, -7.782958],
+      [110.370952, -7.782932], [110.369772, -7.782932], [110.368827, -7.782932]
+    ];
+
+    const CHECKPOINTS = [
+      { id: "S", code: "S", km: 0.00, lng: 110.368827, lat: -7.782932, name: "Kantor OJK DIY (Start / Finish)", sub: "Jl. Jend. Sudirman No. 22 • Mulai 05.30 WIB" },
+      { id: "1", code: "1", km: 0.20, lng: 110.367070, lat: -7.782880, name: "Tugu Yogyakarta", sub: "Belok kiri ke selatan menuju Jl. Mangkubumi" },
+      { id: "2", code: "2", km: 0.56, lng: 110.366703, lat: -7.786130, name: "Jl. P. Mangkubumi No. 36", sub: "Koridor Mangkubumi menuju Margo Utomo" },
+      { id: "3", code: "3", km: 0.98, lng: 110.366257, lat: -7.789822, name: "Jl. Margo Utomo No. 3b", sub: "Belok kiri ke timur melewati Jembatan Kleringan" },
+      { id: "4", code: "4", km: 1.85, lng: 110.373560, lat: -7.787118, name: "Kawasan Kotabaru", sub: "Jl. Abu Bakar Ali – Kolsani – Jl. Yos Sudarso" },
+      { id: "5", code: "5", km: 2.42, lng: 110.375280, lat: -7.782932, name: "Perempatan Gramedia", sub: "Belok kiri ke barat lurus menuju Kantor OJK" },
+      { id: "F", code: "F", km: 3.10, lng: 110.368827, lat: -7.782932, name: "Finish Kantor OJK DIY", sub: "Selesai 3,10 km • Ambil Foto Selfie Finisher" }
+    ];
+
+    const TOTAL_KM = 3.10;
+    let progress = 0;
+    let elapsedSec = 0;
+    let hwSteps = 0;
+    let simOn = false;
+    let gpsOn = false;
+    let gpsId = null;
+    let follow = true;
+    let darkMode = true;
+    let reached = new Set(["S"]);
+    let curCoord = { lng: ROUTE_COORDS[0][0], lat: ROUTE_COORDS[0][1], bearing: -90 };
+
+    // Restore state
+    try {
+      const st = JSON.parse(localStorage.getItem("ojk15_strava_v2") || "null");
+      if (st && typeof st.progress === "number") {
+        progress = Math.min(1, Math.max(0, st.progress));
+        elapsedSec = Number(st.elapsedSec) || 0;
+        hwSteps = Number(st.hwSteps) || 0;
+        if (Array.isArray(st.reached)) reached = new Set(st.reached);
+      }
+    } catch (_) {}
+
+    function saveState() {
+      try {
+        localStorage.setItem("ojk15_strava_v2", JSON.stringify({ progress, elapsedSec, hwSteps, reached: [...reached] }));
+      } catch (_) {}
+    }
+
+    function resetSession() {
+      simOn = false;
+      if (gpsOn) stopGPS();
+      progress = 0; elapsedSec = 0; hwSteps = 0; reached = new Set(["S"]);
+      try { localStorage.removeItem("ojk15_strava_v2"); } catch (_) {}
+      updateSimBtn();
+      renderCP();
+      syncUI();
+      drawSelfie();
+    }
+
+    function haversine(lat1, lon1, lat2, lon2) {
+      const R = 6371000;
+      const dLat = (lat2 - lat1) * Math.PI / 180, dLon = (lon2 - lon1) * Math.PI / 180;
+      const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
+      return 2 * R * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    }
+
+    function sampleAt(t) {
+      let total = 0; const segs = [];
+      for (let i = 0; i < ROUTE_COORDS.length - 1; i++) {
+        const d = haversine(ROUTE_COORDS[i][1], ROUTE_COORDS[i][0], ROUTE_COORDS[i+1][1], ROUTE_COORDS[i+1][0]);
+        segs.push({ d, cum: total }); total += d;
+      }
+      const tgt = Math.max(0, Math.min(1, t)) * total;
+      for (let i = 0; i < segs.length; i++) {
+        if (tgt <= segs[i].cum + segs[i].d || i === segs.length - 1) {
+          const f = segs[i].d > 0 ? (tgt - segs[i].cum) / segs[i].d : 0;
+          const a = ROUTE_COORDS[i], b = ROUTE_COORDS[i+1];
+          return {
+            lng: a[0] + (b[0] - a[0]) * f,
+            lat: a[1] + (b[1] - a[1]) * f,
+            bearing: Math.atan2(b[0] - a[0], b[1] - a[1]) * 180 / Math.PI,
+            idx: i
+          };
+        }
+      }
+      return { lng: ROUTE_COORDS[0][0], lat: ROUTE_COORDS[0][1], bearing: 0, idx: 0 };
+    }
+
+    // Hardware pedometer
+    let lastAcc = 0, lastStepT = 0;
+    if ("DeviceMotionEvent" in window) {
+      window.addEventListener("devicemotion", e => {
+        if (!gpsOn && !simOn) return;
+        const a = e.accelerationIncludingGravity;
+        if (!a || a.x === null) return;
+        const mag = Math.hypot(a.x, a.y, a.z), now = performance.now();
+        if (mag - lastAcc > 2.6 && now - lastStepT > 330) { hwSteps++; lastStepT = now; }
+        lastAcc = mag;
+      });
+    }
+
+    function closeSplash() {
+      const sv = document.getElementById("splashVideo");
+      if (sv) sv.pause();
+      try {
+        const el = document.documentElement;
+        if (el.requestFullscreen) el.requestFullscreen().catch(() => {});
+        else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
+      } catch (_) {}
+      document.getElementById("splash").classList.add("hidden");
+      setTimeout(() => { if (map) map.resize(); }, 250);
+    }
+
+    // =========================================================================
+    // 2. MAPLIBRE 3D
+    // =========================================================================
+    const STYLE_DARK = "https://tiles.openfreemap.org/styles/fiord";
+    const STYLE_LIGHT = "https://tiles.openfreemap.org/styles/liberty";
+    let map = null, userMarker = null, fallback = false;
+
+    function initMap() {
+      if (typeof maplibregl === "undefined") { startFallback(); return; }
+      try {
+        map = new maplibregl.Map({
+          container: "map3d",
+          style: darkMode ? STYLE_DARK : STYLE_LIGHT,
+          center: [110.3706, -7.7864],
+          zoom: 14.9,
+          pitch: 52,
+          bearing: -10,
+          antialias: true
+        });
+        let ok = false;
+        setTimeout(() => { if (!ok) startFallback(); }, 6000);
+        map.on("styleimagemissing", e => {
+          if (!map.hasImage(e.id)) {
+            map.addImage(e.id, { width: 1, height: 1, data: new Uint8Array(4) });
+          }
+        });
+        map.on("style.load", () => { ok = true; addLayers(); });
+        map.on("load", () => { addPins(); addUserDot(); drawSelfie(); });
+        map.on("error", () => { if (!ok) startFallback(); });
+      } catch (_) { startFallback(); }
+    }
+
+    function addLayers() {
+      if (!map) return;
+      const lys = map.getStyle().layers || [];
+      let has3D = false;
+      for (const l of lys) {
+        if (l.type === "fill-extrusion") {
+          has3D = true; map.setPaintProperty(l.id, "fill-extrusion-opacity", 0.85);
+        }
+      }
+      if (!has3D && map.getSource("openmaptiles")) {
+        map.addLayer({
+          id: "buildings-3d", source: "openmaptiles", "source-layer": "building",
+          type: "fill-extrusion", minzoom: 14,
+          paint: {
+            "fill-extrusion-color": "#1E293B",
+            "fill-extrusion-height": ["coalesce", ["get", "render_height"], 11],
+            "fill-extrusion-base": ["coalesce", ["get", "render_min_height"], 0],
+            "fill-extrusion-opacity": 0.86
+          }
+        });
+      }
+      if (!map.getSource("r-full")) {
+        map.addSource("r-full", { type: "geojson", data: { type: "Feature", geometry: { type: "LineString", coordinates: ROUTE_COORDS } } });
+        map.addLayer({ id: "r-case", type: "line", source: "r-full", layout: { "line-join": "round", "line-cap": "round" }, paint: { "line-color": darkMode ? "#FFFFFF" : "#0F172A", "line-width": 10, "line-opacity": darkMode ? 0.85 : 0.35 } });
+        map.addLayer({ id: "r-main", type: "line", source: "r-full", layout: { "line-join": "round", "line-cap": "round" }, paint: { "line-color": "#FC4C02", "line-width": 6.5 } });
+      }
+      if (!map.getSource("r-done")) {
+        map.addSource("r-done", { type: "geojson", data: { type: "Feature", geometry: { type: "LineString", coordinates: [ROUTE_COORDS[0], ROUTE_COORDS[0]] } } });
+        map.addLayer({ id: "r-done-line", type: "line", source: "r-done", layout: { "line-join": "round", "line-cap": "round" }, paint: { "line-color": "#0EA5E9", "line-width": 5.5 } });
+      }
+      syncUI();
+    }
+
+    function addPins() {
+      if (!map) return;
+      CHECKPOINTS.slice(0, -1).forEach(cp => {
+        const el = document.createElement("div");
+        el.className = "pin-dot " + (cp.id === "S" ? "start" : "");
+        el.textContent = cp.code;
+        el.onclick = () => {
+          follow = false;
+          document.getElementById("btnFollow").classList.remove("active");
+          map.easeTo({ center: [cp.lng, cp.lat], zoom: 16.5, pitch: 58, duration: 700 });
+          showToast(cp.name, cp.sub);
+        };
+        new maplibregl.Marker({ element: el }).setLngLat([cp.lng, cp.lat]).addTo(map);
+      });
+    }
+
+    function addUserDot() {
+      if (!map || userMarker) return;
+      const el = document.createElement("div");
+      el.className = "user-dot";
+      userMarker = new maplibregl.Marker({ element: el }).setLngLat([curCoord.lng, curCoord.lat]).addTo(map);
+    }
+
+    function toggleMapTheme() {
+      darkMode = !darkMode;
+      document.getElementById("btnTheme").classList.toggle("active", !darkMode);
+      if (map) map.setStyle(darkMode ? STYLE_DARK : STYLE_LIGHT);
+    }
+    function toggleFollow() {
+      follow = !follow;
+      document.getElementById("btnFollow").classList.toggle("active", follow);
+    }
+    function resetCam() {
+      follow = false; document.getElementById("btnFollow").classList.remove("active");
+      if (map) map.easeTo({ center: [110.3706, -7.7864], zoom: 14.9, pitch: 52, bearing: -10, duration: 750 });
+    }
+
+    // =========================================================================
+    // 3. UI & TELEMETRY SYNC
+    // =========================================================================
+    function fmtTime(sec) {
+      const s = Math.max(0, Math.floor(sec));
+      return `${String(Math.floor(s/60)).padStart(2,"0")}:${String(s%60).padStart(2,"0")}`;
+    }
+    function fmtPace(sec, km) {
+      if (km < 0.05 || sec < 5) return `13'52"`;
+      const p = sec / km;
+      return `${Math.min(25, Math.max(4, Math.floor(p/60)))}'${String(Math.floor(p%60)).padStart(2,"0")}"`;
+    }
+
+    function syncUI() {
+      const km = progress * TOTAL_KM;
+      const pct = Math.min(100, Math.round(progress * 100));
+      const sec = elapsedSec > 2 ? elapsedSec : Math.round(progress * 43 * 60);
+      const steps = Math.max(hwSteps, Math.round(km * 1315));
+      const kcal = Math.round(km * 63);
+
+      document.getElementById("cDist").textContent = km.toFixed(2).replace(".", ",");
+      document.getElementById("cTime").textContent = fmtTime(sec);
+      document.getElementById("cPct").textContent = `${pct}%`;
+      document.getElementById("progFill").style.width = `${pct}%`;
+      document.getElementById("scrub").value = Math.round(progress * 1000);
+
+      document.getElementById("mSteps").textContent = steps.toLocaleString("id-ID");
+      document.getElementById("mPace").innerHTML = `${fmtPace(sec, km)}<small>/km</small>`;
+      document.getElementById("mTime").textContent = fmtTime(sec);
+      document.getElementById("mKcal").innerHTML = `${kcal} <small>kcal</small>`;
+
+      let activeCp = CHECKPOINTS[0];
+      for (const c of CHECKPOINTS) if (km >= c.km - 0.08) activeCp = c;
+      document.getElementById("guideTitle").textContent = activeCp.name;
+      document.getElementById("guideBody").textContent = activeCp.sub;
+
+      const pt = sampleAt(progress);
+      curCoord = pt;
+      if (userMarker) userMarker.setLngLat([pt.lng, pt.lat]);
+      if (map && map.getSource("r-done")) {
+        const sub = ROUTE_COORDS.slice(0, pt.idx + 1).concat([[pt.lng, pt.lat]]);
+        map.getSource("r-done").setData({ type: "Feature", geometry: { type: "LineString", coordinates: sub } });
+      }
+      if (map && follow && (simOn || gpsOn)) {
+        map.easeTo({ center: [pt.lng, pt.lat], bearing: pt.bearing, zoom: 16.2, pitch: 58, duration: 350 });
+      }
+
+      CHECKPOINTS.forEach((cp, i) => {
+        if (i === 0) return;
+        if (km >= cp.km - 0.03 && !reached.has(cp.id)) {
+          reached.add(cp.id);
+          renderCP();
+          showToast(cp.name, cp.sub);
+          try { if (navigator.vibrate) navigator.vibrate(cp.id === "F" ? [200, 80, 200, 80, 300] : [120, 60, 120]); } catch (_) {}
+          if (cp.id === "F") { launchConfetti(); drawSelfie(); }
+        }
+      });
+      saveState();
+    }
+
+    function scrubTo(v) {
+      progress = Math.max(0, Math.min(1, Number(v)/1000));
+      elapsedSec = progress * 43 * 60;
+      syncUI();
+      drawSelfie();
+    }
+
+    function updateSimBtn() {
+      document.getElementById("icoPlay").style.display = simOn ? "none" : "block";
+      document.getElementById("icoPause").style.display = simOn ? "block" : "none";
+      document.getElementById("lblSim").textContent = simOn ? "Jeda" : (progress >= 0.99 ? "Ulangi" : "Simulasi");
+    }
+
+    function toggleSim() {
+      if (gpsOn) stopGPS();
+      simOn = !simOn;
+      if (simOn && progress >= 0.995) { progress = 0; elapsedSec = 0; hwSteps = 0; reached = new Set(["S"]); renderCP(); }
+      updateSimBtn();
+      document.getElementById("topStatus").textContent = simOn ? "Simulasi Rute" : "3,10 km • Siap";
+    }
+
+    let wakeLock = null, lastGpsPos = null, gpsRealKm = 0;
+    window.addEventListener("beforeunload", e => { if (gpsOn) { e.preventDefault(); e.returnValue = ""; } });
+    window.addEventListener("popstate", () => {
+      if (gpsOn) {
+        history.pushState({ lock: true }, "");
+        showToast("GPS Masih Aktif", "Matikan GPS dulu sebelum keluar aplikasi.");
+      }
+    });
+    async function toggleGPS() {
+      if (gpsOn) { stopGPS(); return; }
+      if (!("geolocation" in navigator)) { showToast("GPS Tidak Tersedia", "Gunakan tombol Simulasi."); return; }
+      simOn = false; updateSimBtn();
+      gpsOn = true;
+      lastGpsPos = null;
+      try { history.pushState({ lock: true }, ""); } catch (_) {}
+      try { if ("wakeLock" in navigator) wakeLock = await navigator.wakeLock.request("screen"); } catch (_) {}
+      document.getElementById("btnGps").classList.add("gps-active");
+      document.getElementById("lblGps").textContent = "GPS Aktif";
+      document.getElementById("btnSim").style.display = "none";
+      document.getElementById("topStatus").textContent = "Mencari GPS...";
+      gpsId = navigator.geolocation.watchPosition(
+        p => {
+          const { latitude, longitude, accuracy } = p.coords;
+          document.getElementById("topStatus").textContent = `GPS ±${Math.round(accuracy)}m`;
+          if (lastGpsPos) {
+            const stepM = haversine(lastGpsPos.lat, lastGpsPos.lng, latitude, longitude);
+            if (stepM > 3 && stepM < 80) gpsRealKm += stepM / 1000;
+          }
+          lastGpsPos = { lat: latitude, lng: longitude };
+          let best = 0, minD = Infinity;
+          for (let i = 0; i < ROUTE_COORDS.length; i++) {
+            const d = haversine(latitude, longitude, ROUTE_COORDS[i][1], ROUTE_COORDS[i][0]);
+            if (d < minD) { minD = d; best = i; }
+          }
+          if (minD < 300) progress = Math.max(progress, best / (ROUTE_COORDS.length - 1), Math.min(1, gpsRealKm / TOTAL_KM));
+          if (userMarker) userMarker.setLngLat([longitude, latitude]);
+          syncUI();
+        },
+        () => { showToast("Lokasi Ditolak", "Izinkan GPS browser atau pakai Simulasi."); stopGPS(); },
+        { enableHighAccuracy: true, maximumAge: 1000, timeout: 10000 }
+      );
+    }
+
+    function stopGPS() {
+      if (gpsId !== null) { navigator.geolocation.clearWatch(gpsId); gpsId = null; }
+      gpsOn = false;
+      document.getElementById("btnGps").classList.remove("gps-active");
+      document.getElementById("lblGps").textContent = "Mulai GPS";
+      document.getElementById("btnSim").style.display = "";
+      if (wakeLock) { try { wakeLock.release(); } catch (_) {} wakeLock = null; }
+      document.getElementById("topStatus").textContent = "3,10 km • Siap";
+    }
+
+    let tTimer = null;
+    function showToast(title, sub) {
+      document.getElementById("toastTitle").textContent = title;
+      document.getElementById("toastSub").textContent = sub;
+      const t = document.getElementById("toast");
+      t.classList.add("show");
+      clearTimeout(tTimer);
+      tTimer = setTimeout(() => t.classList.remove("show"), 3200);
+    }
+
+    function toggleSheet() {
+      const sh = document.getElementById("sheet");
+      sh.classList.toggle("open");
+      document.getElementById("icoChev").style.transform = sh.classList.contains("open") ? "rotate(180deg)" : "rotate(0deg)";
+    }
+
+    function openDetailTab(tab) {
+      const sh = document.getElementById("sheet");
+      if (!sh.classList.contains("open")) toggleSheet();
+      switchDetailTab(tab);
+    }
+
+    function switchDetailTab(tab) {
+      ["Stats", "Pos", "Selfie"].forEach(k => {
+        const low = k.toLowerCase();
+        document.getElementById("dt" + k).classList.toggle("active", low === tab);
+        document.getElementById("pane" + k).classList.toggle("active", low === tab);
+      });
+      if (tab === "selfie") drawSelfie();
+    }
+
+    function renderCP() {
+      document.getElementById("cpList").innerHTML = CHECKPOINTS.map(cp => {
+        const done = reached.has(cp.id);
+        return `
+          <div class="cp-row ${done ? "done" : ""}" onclick="flyTo(${cp.lng},${cp.lat},'${cp.name}','${cp.sub}')">
+            <div class="cp-dot">${done ? "\u2713" : cp.code}</div>
+            <div>
+              <div class="cp-name">${cp.name}</div>
+              <div class="cp-sub">${cp.km.toFixed(2).replace(".",",")} km • ${cp.sub}</div>
+            </div>
+          </div>
+        `;
+      }).join("");
+    }
+    renderCP();
+
+    function flyTo(lng, lat, title, sub) {
+      follow = false; document.getElementById("btnFollow").classList.remove("active");
+      if (map) map.easeTo({ center: [lng, lat], zoom: 16.5, pitch: 58, duration: 750 });
+      showToast(title, sub);
+    }
+
+    // =========================================================================
+    // 4. SELFIE FINISHER GLASS WATERMARK STUDIO
+    // =========================================================================
+    let photoImg = null, stream = null, front = true, wmTemplate = 0, camWide = false;
+    const LOGO_DATA_URI = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAKAAAACgCAYAAACLz2ctAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAAEa8AABGvAff9S4QAAD65SURBVHhe7Z0FeFTH2scn7tk4bi3Ubp1SCi1SinsgIUSwQJQIcXfXjbu7uxBXQkiCBQheXALF3fb/PbPZUNi2tL2V23u/83ueebJ23jOb8993Zt4z8w4hDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDP8lPBkI+vD5qbD1nLNR3wEQ4n+fgeEv4Uab07inAyH5z46GAIPxwIVonFr+VV+XhMQY/s8yMPypPDjgv+bZsdCruBiD5yfYeHo6HCc05+KklDy6lFWaQYgA/zEMDH+Yuy1uSk8PByXjTARwgo3Hx0Px5AQbxzRmo0NYGnuUVbBfZQR2q6h8zH8sA8Mf4kl/0Lpnx0LP41IMnhwK4nq9RwcDcXjpl2gXlqKej1uOqIzELqUR6/mPZ2D4t7jX6/fR06MhpTgbCZwM44ru2YUo3G1ywb4v3kebsDR2Kau8LIdGjMQuZeUt/HYYGH4XN3d5TXhyJDjy6dGQpzgfjcf9gXg8EIznF6NxNcEQXWNGo01cFp0qKuhUHi7KODhCBR0qilr89v7rcIMg/0sMfwOP9vtNfDYQEvR0IOQOHWQ8GwjGw4MBeHomAo8HQnDSeCnaJGTRJiOPDhUVdCgrc0s7r+xXVkGbsvJafrv/NcTuniiQsT9MIOvgCYH8gQGSsm8b/0cY/gKeHgqa9uRIUPyTgZD7VHgvjoZwhTfs9W6W2aBv+gdoFpJEu4LSkOCUhkrbK2WvsgqaFJTX8Nv/x8NukRNM3uMimLr3jmDRKQjkHAYpOIl3Gk/izLHUxfwfZ/gTuFKnI/VkIGTjs6PBrS+OhXJjec+PhuDRwQA86g/Es7OReHwkGKcsV6FNTgHN4jLUu70muFa+0qusjCYFhf8eAUa3jROO2+UsFL/rolD2EQim9kIwqRsCqb0gSf1w29sJzsWoUv7DGP4Adzssv3nY5x75uD/gHO3f4UwknhwO4oqODjKengzDs3ORGEw3wZ7P3kWjoCRa5RS54hsWWouS0k9Ks5ISev4bBBjTIS8a1qgqHNGcKxzZek84bT+EErshFNcJwYQuCCbvAUnpBUk7gJMncsE5HXGY3wTD72SweN0ndzvtXB8d8D2I4yGgzSxOhA2Jjie8J8dCuc3tnUYXHFKfhSYJWW7hF1yDhAzqRaXQKMNCs7IyV3hNvLLnHyhAFrtFTsK3arqoX7W5SEBNmWhQ7XWR6E6IxHdDOKoVwpEtEIpue0WA3SBxfdBp3gdcicfjo2F7+W0y/AoFBepCp+O/m38mbVn4uezVhy4XrgN6rIEzUXhyOPhH4fUH4snREK7wHvT44IT5crSqqKBeWBLNioovPRu3KCqikSWP46bLcTV9O3ZPex/10nJoVFR6WXYrKaP+DwhQUTdARnmT20h5Da9x8hvcxits9B6jpO09SlE3YDQtErRsj+QWSeOokRIGsWNkTePeljJL/Fh6R8osCev0VZL2GfoSjtleEk552WKu+XvEPIqvi/lVQTysGaJhLRANrYdI8E6IhNZDOLzxRwHGdnAFSOJ2QyF3ABdPlgMX2LjXz87gryfDG9jj+7n2sciZR84lz8f13BW4kqeK83lquFSsjQf7fPD40JAAn54Iw/MLUVzhnXZSQ/uksagTkkCTnDyalYdEN+zZaGmQkUP7lAl4eioMeJKBy0mGqBGWRIOiIrfUKyqiS0npdwuQtcp8ouI6F28FDddehfWug/Lr3e7La3s8lt/g9Zi1yecha7PvfdktAQ9ktwY+lNELfihjwH4obRT+UHp75H0Zk+iH0mZxz6UskyFllwkpp3xIuZdC0qsCkt6VEPepgLhXGcS8SiHmUwZRvwqIBlRDJLh2SIBhVIDNLwUoENcJEr8POQe7gYMewOkw3NwXuIq/zgy/QJf7B9qnw77AicgZOBQxCwOx83EyZRnOZFERquPuHmc8Px+DZ2fDcaveDke3L+IJT5IrsGGxverVaGmgRV4BdSx5nAvaiEeHgtC37EvU0uZYURF1vLJLSQm1v0OAiittDJXVnO4o6/hAScsDCpoeUND2hPwGL8hv8oHcZn/I6QaCtS0YLP1QyBqGQdY4ArLboyBjGgMZ8zhI70iA1I5kSFmlQNI6FZK2GZBwyIKEUw7EXfIh7l4IMc9iiHm/IsAgKsC6IQFGUAG2QjCmHSSyG5YdB4GDfuAcdMetPV4n+vriRfjrzfAz0EkAu5zeOTwQ+An2+k/FQfZMHIn+FidSluBMwRpcqNTE9YbtuJpuhP1rv0KTiiJ28oT3E7HxvNqwZ6uTleOKr1aahdb3J+GU6zpUCoqjTkkJOxUVX5bO3yFA5RWWtioa7lBWd4LiWgcoqjtBQcMFCppukNf24IpQbiMVoR9YugFgbQuCrH4IZA3YkDUKh8z2SMiYRkPaLBZS5gmQskjmCTD9FQHmQdztFQH6UgFWDQkwhAqwgStAwcgWkLBd0Gnsx/N9QbjbYgYc8cXVXW6r+evN8AsARKDDcfLZg8Efoi90Kg7GzMSRhG9xNHo+jnjMxT6tqWj/13jUSchgp4g0GuQUXhMbFdpPipIiamVYaBw/Gg2jR6JKXBrtn07BSbd1qJKUQa2i4lBRUOCWdkVFVP0GASott5ijstYRSqp2UFpj9/MC1PmpAFl6bxJg0o8CtP85AZa+FKBoUA1XgCJhDSDsRq749JoO4nGPP27WbAMOuuJKs202f70ZfoUO40n+p/SnYM/6Kdi1bDI6vpqIlkmjUC+jgJ2isqiTlkODws8LbrgZHS7Uo1VLyaL9sym4t9sLd1rd0PL+JDS/NxEnXdVRKS6NGgWFl6VaQQFtv0WAbm6CSst2HOQKcLUNV4S/JkC5lwIM5gkwjCfAKEibxkLKjCdAq2EBZkLCcViABRD3GBKgmG85RP2HBCgcshMkoA7CMT0IaO/EkzZ7DJZq41mXFa43Wezvq3CT5K86w6/QQohwo7h8dJukwqPdkgrollbAHjlF7FFSQrcyHaUqcQcK9G83N673ehNKy6terUJEEj3LvwSuxQM3E9G7egYaJo3BCVd1VIhLc0VX9Upp/Q0CVFpqsmyEqgOUV1r9ogAVtKgAPSHPFaAv5HT9wdoayBNgKE+AET8jwBRI2qRDkivAbEg4DwuwaGggwhVgJYhPFYh/E2bk7UXb7gI8q9qACxlL8KjJAD/UbT92tGz7aP56M/wO6lisSW0KCmubFBRMGxQVbeoVFMzrlZS27VRU1K5VUtKslZenj0PrFRW/7xjqt70sr3k1OXlUSsviTMgmnIvcinJJaTR/9DaOO6uhTFwalVSkMixUsOS4j5sVFVCuwHqjAFWWmBW/FOCqYQHa8wToDIX1rlDQcucJ0PvXBWgWA2mzeEjtSBoaiNikvSLAXIi7DglQ2KMExLUUxLsOH6TsRlxLHe60u+Fu/kpczlmFJ1UauFystas3U28Uf50Z/iJalJWl6+Tli2jfjXqzV8uwVysRkkDvmq/Rt24WCokwmj+dgmNOa1AqLoUyaRZqJ41EpYoiyllyNAiNctYvC5A1x1xOZYnZbZWVVlBeYQmlVdZQUrXlCdARiut+QYBbfkaAxhGQMXlVgIk/CtAuA+IO2RByyAGxzwdxLIWEfz0WZrYivbkC1zv98LhiPa7krMC9Cg1czVd9cSF/XWB8vD4z4v27qRsxQqpWQeEa7fcNi456s+FSIiKBPu052LvxWxQSETR9OhlHndagQEAUu9U/w6UKHRzxXIgylhwa5ORR8gYBKi/avmjEShuoLLd4TYBKbxLgpjcLUMosBhKm8RAxSwIxSwUxzwSxyAGxK4SKTzkWJlQhoKIYe9vj8LDNDo8qNPFDoSruV2nhdpkGLuetqT+etvpL/roy/I1UKCjk0v5bpYI8Kl4t8vIoEpZAr+Zs9OnMRQERQcMnk3HUeS3yiSgOu83H9c5tOJupjnIVRdSx5N4swMWmXiNX2UFl2Q6uAJVfFaDaTwXI2uANSR0fiGj7gWgHgOgEg2wMBdkUBqIbCaIfDSHjWLDM4zDWNh5feMRCLTgcTokhKKmMxMlWfzxss8Hzhq14WKWFBzU6eFy3CVcK1z26kq9Wci5HbQF/HRn+A1TIy/u00f6bvPxrpUxeHoXCEujRmMUVYB4RRd2Hb2HAURX5wuKonjIKJ2NWoXXB+yiUlEGdgjwK3yTARSb1XA/4CwJUWOcMybXOIKtcQFTdIK3tjXEG/phpHwx1v1AYhbPhEM+GX2ooYnKCkVMUiIYqPxxq8MSFVhc82GUHdFsC3eZA13agwxDPWg1xu3YrrpRsuH61RLv6UpGmydl8tUn8dWP4D1ImJ+faoqDAFRwtRWJS3FIqL48CYQns0fgavRvnIJeIYOfHk3DESRUF4pIoEJdCj+50lI5UQpEsC7VUsL8gwMmLTcVUFm2/OGK55WsCVFa1hfxqOwgusYXICgf8y9AbhmFhyN+ZhDPHcvHiSh5wIxu4kQpcSwAuRwPn2cDpQOCoD9Dvjuc9TrjXYYMbzZaPr9Wb/TC40/j4YK1R02C1XvyVcl3TSxVbvjlTukmOv04M/xBK5OU9mxUUuIIrkpZB88z30fTVu9zH1NPtWT8kwBwqwI8m4YijKvJEJVEoLYteo5komzACBTIs1LxBgKMWmrw3YrEJR2Wp+UsBKq60huB8S8ivtsdW/2B092YA1wuAS5m43h93n3M5sZTzfSz74UCU/d1+tsH1vYE6P+z1X3Ot23vZ1d0eC653uM0dbHf4+ly9zRdnG60+uNRgNv5MqbkcAGZp6H8TxfIsr0YFeeSLSKB90Sd4eswbjw96oP7zycgiQujW+AY9G+cii4ig5sNJOOywGrmiksjnCnAGyiaqIF9GFtXycshnsdT47VNGLjBSH7ncCipLzDBi+Q5ILjSH+EILGPoH4tLpXDwfzENVRTg2WNnj/dU7wJqxOZ/fBsP/KIXyLK8GBXnkCUugbfGneHzYHY/2u6J+2jvIIELYrfE1ejbMRiYRRvWHk3DIYRVyRCWQKy2DHqMZKJ2ogjwZWVRSAcrKruO3TxmxwDho1AprjFhiBuE5JvhQ2w7d3Sm4fzkXgYlBeEfNEoIzDSEy0wDyCywgP0ffht8Gw/8o+SyWdx1tPuXkkC0ojn6rxejT/xbZwuLIFhJHl8YM7F4/ExlEGFUfTsBBu2XIEpVADk+AJRNVkCMjiwq5NwnQqGPkMksIfG2ENVYuuHc+E7mV0ZioYQ8ydwdkFltAmYZnlu6AynIq1B3z+G0w/I+Sx2L57JSXQ4EcC1mCYuhUm4bGb/+FLBEJZAqLo1N9OjrVpiOdiKDyX1SAS5EpKolsSRl0G8xA0QQVZEvLoFyOhcyfaYLl5+uzRiwwvCX0tTG2OLjg+YU0bPUPBFlkD6lVDlBa6zA0MWG1LZRX20JpueXDEapWKvx2GP5HoQKslZdDHhWQsDi6NL9C86KPuV4uXVAMbSumol11GlKJCMrfH48DtkuQISqBTElpdBt8hcIJKsiSlkExSxZpoqJL+O2PWWA8XWyWMVYa2+D20TgscAgEWekOeS0PKGq6QVHDFYrqztxQjPI6NyiutmOmwf9/IofF8qEDiFwWCxlC4ti1fjqaFn2MdCFxpAmKod9+KXZ+/S7ShMRQMmU09lkvRLqoBDKkpLHb4CsUjFdGprQMihTlUf7lBz9pOsWmb9ObomqFU7tCsMA1FETNH3Kb/CG3wQ9yOj6Q1/aGvJYnFNa7Q2mDPxTUnaP5bTD8D5PFYvlUybGQw5JFupAYOjS+ROOCD5FACHqNv0Xv9nlIExFHiqAYame9i72W85EiLI50SSl06U1H3jhlpIqKo+6TKbjVzf7pJM6PdSPz0r1hFR8BosUGSy8UsltDwNINAmtLIFibAsDa6Ae5Db6Q12VDTttHh98EP5wyRRlO8aJRKFr21uOS1e9wSha/zSn7bDSnk8jwf5bhH042S8a3Uo6FbJYsUoXE0K4xDVXTJ6Nl9ec46LgEqVR8wuIomDQCh71XcP+mUA8oJ4s+69nIUpZHAhHAvs2LwOG0a/LbV99m1FhYHgaiFwsp4yjIGEVAxjAcsvphkNVjQ3ZbCGR1g8GiZUsQiFrAu8PHws1N8EmL4YdN1c4bg/ID2JbZ0bWaGSlHFqTnXv04tezB+OSdz0cm13Po349Tyh5+k1owuDQ968iGjMQa52x2QHG+gxoavh7/eo0Y/lFksmR8hwYQskgREkfTik9w2Gs59lovQJqEFJKFxJAzShGHfZaj+P2xSCSiSBaVwB7zb1C3+H3u4zhCcCPPERzOHv7cMEJ5cVanvw5IhsD2REjTdRymsZA2iYE0XdthFAkZwwjIGoRB3CCaesgTi01NxR7ttpt7t8Mm4maz+dEbDSa41maDs822OFlngUMVJthTZIzafAsk5LrCPCsS09LLQVIPgCQfA0k7BJLVD8ncgxiXswtTU0ofrc9IbQvP892BiqmMGP9pZLBk/MrkWMhgySJZUAwtap/jWKgqUiWlkCQohkwlORzyWYqyLyYigYgikYZmDGegVftzxBMxJImJI2uMCnCzCJzHla+Ngjnnl41hp3k/JpY5kLROgaRVMnfyqBRdTGQeD2mzOAgbxYJsjcXIHTHwiPW99HS3zYEnexyAvY64326Ba3XGuFalh8GKzbhSugGXizRxNV8dPxSsxZ0CVTwsXIUryQtQk7QFxplxkE9qA4npAaGr3Lgr3Xq4ohTO2I+34ivuqyYnpu7J0vr01Xoy/AdJk5UJKKH9P1kZJAqKoVntM1TPfgfxRARpsjLo91yMqjnvII6IIF5ADO2bvsAug68QLyiGZFlpRBGCPms1AF1IPdT4Wn7Ae516337DTgexyx2aKm+XDknbNEjapELUMgXEOBXj7ePhlRKMs21uwH5HPOl1xs1WK1xvNMdgnQmu1hjicqUeLpVvwYWSjThXqIWzeRo4n7+eWy4UauFk8jIc8v4Ep4KmoidrK/TyM0Gid0Msth16BVmwLc1AQlMq0juzYdzYgOmp5S+0k6KSOMWTx75aX4b/AGmy0oE0hJIqK4MEQTE0rvkU1fPeQ6yAMHZv/xoNqz5CLBFBLBFF49qPscdiFuKFxZAkLYU4UVGkj1bG0zMpuP+8E5809r82gFgSFrdFOrAGYq75EHfJhbhzDsQds0GssrkTRx3SonB1D51U4IonPc641emAm202+KHZEtcbzXCtbjuu1hjgcuU2XCzbjAvFG3CuQBNnctRxNnfdkAALNHEuVx37gr9Gi+PHaLGagvNxC1BSHQCl2FbMzKzB8e4Q+JTEY2dTBG7sD8CBvbGYU9qBzxOKrmdkWzE5Df+TpMpKBxXS/p+sDOKFxNCg+jGqvn2HK7I9Ft8gRU4GsUKiqJr/Dvrs5iJeXAIJkpJIlJZCBCE4Hm8OoAqN17pBMs5qv2pbwKs0VCS0aWhlGp0a71YIYleEOWEZONAZChz1wrN9HrjX444ne92BA7S4gtPngKe7bfCoYwcetpriYYsxd83GvbqtuFGxARcL1uH7rDWvecEj0fOxy3Mq6qw/QIHuGBwJmIGDzR6QjW5CSF0mzvUFgfiUYUxwEZJro/HsiD9m5DZiUmobHNL9UzkniNirdWf4m0iWlQ4pYMlwm9M4IVHUrf4IlXOnIE5IDLuMvkKyvCwyxiqhz34uElkyiBOXRIKMNMIIQavuIuBJBXA/H2p7j4PEn3qtCRbxr2wSCW/hLgonXuUgbuVwLEjFi6NBwIAfMBAInArGk32euNvl/P3tDvuyW+3WvtcbdxgO1pmqXa01XHm1cpvqxbItWy6Vbna8UKSdci5fo/tcjvrtwUI13K3UxrVSHa4AT6WtQrfPl2h2/ASVplOQuk4Re72mY3+7P95LqsaDI0FgV8ZjNLsQZ/tCcLs/EG4VGSAhHZBL24NtqZG7OPkjlV+tP8PfQJK0dGg+7f/JSCNGUAw7V36IijlTECMkhk7DaUiUk0Heh2PQpP0ZImk/UFYabEJQtWQaXtzI54qv70wVBMsvgeQMqL40XFAgJBRc+71wRAuI/06I+NcgqzEZ+D4YOBsBfE9zTfscf7TP2+tBr9uXOOwm+lrF3sCVYlWVM9mrll7IXRNxqVDr0sOdm3G9TAf7Q2ej1flT1Fi8h8Jt4xG7XBrHIhagpDUB24tygZPeiKyKx75dYVDNLgQJaoYAux4koIWblGhjSvQhTvmkEfznY/gLSZSWZufR/p+MNKJpsHnFv1A2+21EC4miXX8qEuSkkfP+KDRv+ByRgiIIJQSVS6bh6ZVM4E4Bnv+Qh88re0GKL0Aoe/+PgejgneOEIpoek7A2SLIbUNeVDFyJBC7H49nR0J4nRwI08CekvqCTTS8Xa1kMlumcu1mkjt28ZrjU8C1kaKogaqkUblfpwaI8H46lmcAJH64Qtxdmg/g1QzqsFkl1iTAuyIZobA+2JobtQwuR5j8Pw19EgrRkWI6sNOJlpBAlKIqa5e+jdPZbiBQSReu2zxAvJ43s90ejYf0nCCAETRu/w/PBLOBmHnAzE/rNrSDJhyFYdgZCmf0/esDYti9JQh/EotvR3JsO3E3C89NRg0+Os/Veq8CfRF+BOut8npr3geCv0eX6Ccq3T0bu5rGIXiKJIv3JuHUwBHLhtZiTWILDvWwszygA8WqGSkQVcMwXHR2RIH4NkIrvgm2CTwW/fYa/iDhpybAs2v+TkUKkoCiqlr2H4m/eQgQNyWz5BHEsaaSOV0CTzmfY46gB3MwBBjOBH9Lg1F4HkrAfAun7IFjyPUQy+36cjhXaNkohuevx7gv1wIMUvDgTW/ngYPhfHvbo9J25sMvj88F2+w+Qv3U8UtcpI2iOIK4VbUJMcy6IRxNkQqshGlyDtRl5EAmqwVuR5RgVXgGhwBoQv3rIx7UgMcXCgd82w18AFWAm7f9JSyFcUBSVS95F0dcTESEkhqaNH3Kb3Lypb+HOXj+8uJYFXEoGrqbCvGEnSEwvBJJ7IJjWB8HiUxBJ7n7tVlzcrsLvOE9yAjlnYn/0jH8D5fafTW60/dfxBvPJSNcaCfZ3Iig3+wg3jsVBKawSxHcnBAOqcakvBJUtMSA+tSBeO0H8qjElsgQfxFVhelTmi+/zVD/ht83wJxMlLRmWTvt/0pIIExRBxeJ3UPj1RAQTgrr1k9Gk+y3uHGDj2flk4GIsrp5Ow/KiOpCIbggk7IZQUjeEUnogVHAcoqk9/5gs+WU2n42uNJ18ulxvHGJXyiJ8sTRe9LlhY0ERiHstJoSX4ub+INzY54dDPeGYFjv0ek1zNJ4dCoBIeCu2RQXs4rfL8CcTKS0Zmkb7f9KSYAuKomzxZGR8oITYEfI4X2qOZxcTgDMxwLkoVPdkYUJCIwi7k5vUUTiuE0IJXRBK2gOhnMMQS9i1iN/+f5Jsk3feK9YffzdzvTICZxFcLNiC/N35IK41+Dy6EJzj/rBIDodpYhgu7wvEwe4IrE/LgmpSNoh3Nd6LKUdlmsFPJtky/IlESksEp9L+n4wUAokgcr8chd12C3G1wRVPTkUDJ0NxcyAa20sKQYKbQEJbIBzVAuHoVgjHtg+JkOsFeyGS2P6P2ysuc8sknZItoxAyRwBdAQtw6kQOiGclPowoAE74o6AyFJJWsZjqE4XGxgBElMWBOFdD2KcUJLARdtHuh2j6O367DH8S4dISgcnSktwRbrSSLA6xdfD4VBg4x4KBo4Eobk7E5MgKEJ96CPLy6omEN3HT23JFGNMO4eQeCMV1/KAc1fKPDF+kaY+uT1kujnKLz/DofDpGhpRCyrcEdw8GY19HENZGRCIgNwyLQqKxPT0eH0VQL1kG4lmB/q4QcHYuZfYL+asIJAK+0UQAJQs/wuUaGzwaCAb6vXGmJwSaqVkgnlUgPtUQDRrOr1wHETYV4VCOZW62+YyDEI5uL+e3/U8hbdP4qcmrZZCnNwU4n4SvaH/Pvhxh5XS/Yx+oh7CxKSwUz44EYVVSNj4KywdxKEN4eTwen4xGcrLVP/a7/dcTOVbB9ZjnGtzd741nB7yAfR5IKY+Cik8hiEs5RIbzK/tXQjSQJ0LqCdn1PBG2gO63IRrVtJTf9j+JmBWyLSV6bwFn4zEvoQDEoQjSnkXIr4vC7cP+8EhnY0FAJKxTo/B1eDby6qKBU75obY/Bcv/Ah2j5YCS/TYY/yJky089ut9odf3LQC+hxwrl2L6yPSQSxp+IrgpgnTe5YAlGaZZ6muH1NhHS7gzqIJPdBhF3Xym/7n0bEUsnNFQZvAWfiMDeOerg8EPsCEOt8xJRHAycCMLArGAc7gnGsKwhXegOAk/5IqYjCWO9M9GZs3Mhvk+EPcLnSbNPtFpsHz3ucgd22KCj2x2jXdBDrPIhxkzvmQcytgDuLhYpQzIfmWR7KMkpFyM21HNUOkYjmW2JB5f/4hD9un5HRBfqTH+FcIr6KygOxysVYz0zUN4fj+v5AZFeEwiEtHEuDo+CcEYYr+wK5ApwXkgDiVAj/SOscfpsM/yZXq/XCH3fY4cUuG9xutYV5TCiIBRUf3eYgA+KOWUNz914T4XCy7/KhJpndCNGwxmdifsU/WQn3T6XS8pNeXErHJP9cKDpl4OSeENzt94dxQgSm+kTjI89oxBaxgVP+XI9onRI9lHfQNgcb/T1OA0SI3ybD76AlSl36avmGGg5NXdZsjIMVdpjhEQlikgpR6xRI2KVCwi4N4vaviNBlWITDGedLIBpSD7GQuieSniXL+c/xT6Y7aGHmo8u5EHfKxpcBSbiyNwg4FoDHhwKRWMLG+Z4g4LQ/aurYmB8YB7I9BcQ0CWRHGuZ5BDxHxzdv8dtk+I30xauzLhVp7n7WrItntetRnWmOERZRIMaJkLSIh6RVIiRskiFhmwoJ21dEyNvyQMwtH2LuBRD2r4WYf/VNMbfCufzn+KdzvVw/7OyZYgjZpIFYpkHBIQXrImMRU0Snh/mjoCoMH7rF4xPPeAiZJ0LGKh4zfGIgsiMRn7jHYF/Wxp8svGf4DbSkbhI/l6vW+WinDh5VrEVirBnEDCMhYEhzLEdD0jz2V0Uo6pwLAe9qjA8uuiblnPIR/zlYm4KnsrYGb5MxCHeXMokLkrRIcZC0z13Oss+W5//sfwrO9YTw2n2lIKYpELdJBtlBPVwKmhrYCMoNB9FPxhj7eKwKiQbZloCQnDDgih9skyIgZ5OMzDgjU36bDL+B42krih5Urce94pUIDDUF0Y2AqH4EN9eyFC/X8msitP5RhBL2GRC0zYSIZznUkrMG29oCPn9pWF1dSEndRV9By2ufPM12YBgFlmk8ZCxTIeWQC0mXQpqp/qqYd6kfMc2Ufa1S/wE4D3LSnSuKuF4/qSQcSrYJcMuIwNNDgSAmCSBbErAlMhLT3KNAdONgGhuOC/2B0GaHQ9IyGSERFkH8Nhl+hUPxS2zvlKzBnbylCAgwAtnIhsTWUG7Cb2nDMEgbR0CaitA0GlLDIrQcFmEKd3Ci4lMCp/zEo5yLNi8XjSstNZ+tvNp+r7KWNxR1fCCn4w3WZn/uQnO6+FzKLB4S1qmQcC2ARHAjxANrjon4lX32eu3+Xp5fzmifHZEDYhKPKc6xYFnG4Wx3ELqaQqAdHonCilCc6Q5CVW0I5M2iQPSioGAaCWHDSChaJ8I72pHZPfP30Bv53UenUxY/v5O7ENEBmyGgEwTJzYGQ3RoIGb1gyPyKCOngZGpoHsobwlo5nA2Kw3YV52+3pmnUlNc6Q3GNAxQ0XCGn7fWjAA2pAOO422fRvdvE3fIhHtoIMXbjbZGA2h896N8IUCHZ25d+TcwyGcQgDkQvDiNtYnBjXxAOtgeDcyQQuOCP1vpg2MSyYR3PxmTrcAjphUPKKAxyO+LhFeXMTFT9PRyInNf6IG8BSkPXQkrbGxI6fty9N2R1/X8UoX4oZF6KMJIrQnGzWBDDJOgkpuHEHt8qDmfyyxVjo+frG05e5wLWYhsIzLeG+PIhAcpTAW4aFmA4pEzjuLsXcQVIl2XSWGJkK0Qimi6QyIaXYv674HDyvvIqzYLijmhuzI82q2KG0TjSEQScCUBKYQhmuYdhhHk4iHYEJA3CuM/ljNiQ1g8FyzQG/lGODfx2GX6B3tBZC6+mzsOB6AWYstkRIhre3F0oWRt9wHpFhLKviFDGOBwiRlEgBrEILYwG55BTKX/s6+MV2yb5exo55cSY3Ati22GWgT2EVrpAYp0Hd4tV2W3BPAHGDgnQPvNHAfpXQiy5D6IRDbmv2nyVS8uXj7+5VcP+ocPG2gfuW/qublrcfHz6+x4dhPyhEMiDS5nuHwfkYE1gGHDLDz3NwSA6UcgoDkFPSxDIlnCQLWHcMsIkFKNN6ZYQoZAzCOH+UOW3RyI81qaJ3y7DL7A3ZGb9nfTZ0DTVB1H14u7DJqftATmdnxch7RMKbA2HlGE4ancGgnPEthwggvx2h+Gc0v2Q02X8PfqsEZvkjZHbwkHUPbn7+3IFaBLD7bhzBUg3DqQCpLtVshsgmtwL4YTOWfw2B0a/p3jis6lXOKsW4EWsH3CwHZzuJtyJD0e/2uoHjfKKdvzH/FaSKpMGhE0SoGQWgR2xofjalQ3hLeGY5x6KrewQkE1siOiGYpZzML7v9sNgnw+2BvtDeGMQZHQDMdIkHFlJFvX8dhl+hjavLyedjpj2PNtrGcRWu0BO3RnyGi6Q/zkR8nYior/20cbB6G/xAOeARQNa3IT57fLTn6311q0Go0Hst8bx7gzMcMkE0fB9XYB066xhAdLbeCE7IZrSB5HYtnZ+e3Tf4yMqow0vBwbj+sMnGOY+gKvXb+BaTR06DE0b982fP2X4mJs3wRocHHzjNDDOrZx5K8JTIbA1DBIGYSA6YVzBSeiFQlIvFAqGQ16OboZTUubHXTWHI5442e4B2S0BEN8UgCnmoWjKNi3ht83wM/QGTDO8mjADczcZQnQlzT7qAAV1p58R4dB+bEQ7EJONffF9iz04vWb7WwqM33hBX+Vk4aa5txqM8KxjO24fzsSiwCKuPa4ALZKGBEjvLdO7KMMCjGqBSPo+CCd2fc1vj3LwwqWea7fvYmDf/sYzz54t3TvQP6Otolqj88hRp66WjrqWnPyejsKSjJ6mNv8D/f2GAwMDb+xTRhTFN8qYx0NSPxTCuqGYYhmKj2xCMMJoSHRkQxBY2wK59XaL8wVOegBH3BCf7gFhLT+I6fhhln0gTlYYx/PbZvgZjgd9nFXhuwhSy+2gsNoWimvsoMAvQrot6gZPCKz3xTuGnjhTtwOc3dsHT5YajeO392ucLd7k+6zTDPeaDHD/WA4WhlaAbGYPCZDu4TssQHoPmQowogkiWYeoAEv5bVFqk1OjqzdsRrSY5IloARE/+lqcrHx7CCHcKV+Rb7/TmvrZVMRpaC/kP5afi6fT58/yTQDRCgHRDIZFTChwOhSPjwbj8t5AZBQGYKqVP4imP6RpH3azHzb5euHCLhfYs91B1H0gqOEDXT9vPG7Rd+a3z/AznAj8oNdouxaEF9txNwVU/BkR0j6hyDpPjN/ijsMlRuDsMsKZMr1v+W39Fvri9UUulW46cbfJmCvCu8eLMSe0BkQvekiA9HYendBABRhcOyTAhF0QTut7TjL2Tn7VVsCYMVPClEc8iCCCmukTJn+WNX7Sjczxb7lmjJt4PGPshC0JYyY4po0e99xXUvZXZykDEDaJjRogGyOxxjcEna2hwNkQ9HaE4FxvII52BXDXBD844I3Nvj7c7oPsBh+Qlb4ozXNBbpYziJoXiJo3QmOdwOnR/ccsuvrHAjci3OX56ffTNAwhs8QSSrydKRVX2wyJcO2QCKXUXMFa74bGVD2gxxDnyrZ58tv6PZzK1lx6d6curlTp4UGTIW4cK8e04FoQ44QfBehbDjEqwPBGiMS2Q6TwBITSeqNetcMeNcYuYtSYk8PPSydNsaqZOOV4xcQp+3LGv5VXPOEtxI4Z/5vmHyaXRgeyTOIwUi8AdwdCcXsgFE0NwRhvEwbdCDZsEoLBOeSJJwc88OKgG1Y4ekJA3QsCal4oynZEcbYDyBoPSK33RGWa6QvOYZ3XfiwMPwPOEPFc2+kXxy43g+IScygv2zEkwpVWL0Uov9YBgqtcEBVsALRtprn3+mk6XH5bv5dzxVua79dtwaXKbXjYbIirRyvwRVgDdzaJuHvhkACDaoYEGNNGPSCEsw48IJkDLzeKZo8c6xw5ZtzR4ef1b79n0jbp3YGGie/0FU6cXJ06bmJx5riJCBsz/o3eaG9X3Ir3bKIwxzEId46FoH9PCN61DcNk2zBsjQiFrFkEprmGoa7aB5wDLsABZxyud4aijjvIag8UZtqjLs+Wm9H/cyN3nCgzOMwsTvoNAEQ40GTOWcVF5lBZbALlJWaviVBptQ0Elzli/Q5T3K/QwJ3aLThTtPHfanr5eXzj2JLH3R64WLiOm9PvYZMhrh8rw7ykDhDrHIh4lw4JkC5sogJM7IJw2fcQyjoQN2yDPXr0p/FjxiNp/KRlaVOmjCma8Pb3FROnFJaMf3swf9JkXfqZuDHj9saOHnc3ZOxYhdcqwOPJhcSPF3qE3x23PRi3j4QgpoTNvf9N9MLR0hAMi3g2VAOCkFnsgy3sQFjE+ONutwOw3w6bXJ1BFrsjLs4WV5stIKrqAjNfF7zYpR/Kfx6GX8Bqy8J9SgvNobLQmE+EFmAtt8botdbYm7oeT3bq4HS+ZjP/8X+Ey20BHfcbjHGhYD1XhPca9fHgeD70yvaBuJSB0Kn9VIDRrRChAszcB6Gi4xzh/P0vN46OHDXOIXnshPtJ4yb+kD5u4o288W/dzhw36VDM+PHcmTWRo8Z/njBmPCdg5Jgkmobw1fNzriW8szE47BIdcFRUBADnguCZFowlvqGYZBcGcaMIEP0IXNntDhx2AvY7wDfZG+4JXsBBK6Qm2YEscsFWZztgrwkcfSxRmWkJzl797149D8Mb2KS1PH/UIjOMmG/IJ0JzCC2whq2dLu4Ur8bNCh2czFm/kv/4P8KpjBXz7ne64nrlNlwuVMelSj3crNsGHI1Hak8/VKI6Qfx2QoCGYqgA03ogVHoagiXHT5CkzpfbLISPmTw2YdKkd4JGfCyVP3Hiu6kTJoi/eh6viRMn+E+Y8P6rArx1POpT7QD2RanNwRDV8IRJsC9uHvAHzvgCx72gFhTM9YTWcf5AvzMvJbA9nu+xgWmEN0422KKz0BISqxyhrO6AvmJTYM92XKnRO3+44Lenj/t/z/RlmuZjF5lgxDz9H0W4yAQKi80waoU5uuLW4HrhGpzMXHu1K19Ngv/4P8rFPPWWI+3hOFe1AzeK1nL7hIM124A+N5w90Qj9mr0QjekCidoDkrwXAln7IVR3BQKVZ5pIfte/VZ+GhtBVy12D7hCNABBVd8hqekBorTve03PHUjt3nGh1x4kOT5SVeeF2txN2+Dphra0j2oqpp7NAfq4TCvIc0V9qBoU19hBdZo+pm61xq30HbuzU9eU/H8MbkJqh++GouXoY+a3eayKUmGeGFVu24XLWUlwvVseJdNWfjcP9UTglC7/syNKDVnQ2TjV44WGFBi6XbcTVWiPcbzUF+gPRuzuem7PvnZwOkMx+kOwTIPV3Qaqv7yGFD6aTAvym9RdAvIhfUpDfF1ZB3JidoZ8XUnN8MWGzO2TXuUJSzRVksQs8w12AEy7AKUfY+DmCfOcIssQRymoO2FtmiUtNFjhcY4nWHFPIrrCF9HJbvKNpg9Nlek85u3Qn8J+X4VcYOWvzgdHzDDFy7raXIhSdbQpnK00MZi3GD8VqOJ62+g+FXt7Es5KV2b6Rdhhhk4Py6mQ8bbfG3eoNuFq9DdebzPFktx1w0A13+oPR2peG0N1VsOrpgs2VyzA7cQwWA/1z+G3y07IzcLGml9/+8YbBEF/nAbG1ruhv9gduhmChlTvEVjtDZq0TyDJHyKxxhH+4IzrK7DFdzx6SK+2hvNYOZKEdTFyswOnaDk6nEdKiTSG62Jo70yc7wQKc5o2p/Odl+A2MnLnJcMw8I4yco/tShJKzjRHnugaX0hdxm+DjqSvN+I/7s3hQtn70nTKNe7Nt3EE2xkI7Mhd72tLxtM8XTzsscKfFFHd32XIXBeFCOHApCpzL8YOcu1mZnKcpswD1n/WAgJtgbanHIkN/7+pPTf1A1viALHeGwEpnCK1yxjembtji7g6ldU6QXeOI9zc7YaOrG0auc4DQUntIrrADa5UtVFTp7pw2EF9ig2XGlrjXYoRn7QawcjEFmW2FObo7cGun7pPbVVp/aBbO/1vGfqUmMXLmpnOjaVM8Rxcj5m6DzCxDpLqvwoXUBbiWvxpHkpb/pRtDPypZbXS2XB8KegEgGv6Q2BaBJYG5yKqrwJljTeBcbTzKuRDpybkWtI7Dif2A/3gKAAEgduLetpC1Pgl+0SsdvAY+NPYBS8ePG0zXcHaHQ5gHjH3d8IUBDaE4gCywh8QKewgstkViihfwOAz6bi4QXmQNmeW2EF5syxWe8koriC+ywkpjczxsNsAPO/XwpY4ZRObuQG+BCZ7Va3FvAzL8m4ycqbN2zFx9jJq1BSNn60Jqpj6iHFbhQsp3uJq7EocTl8byH/Nn86RsTV1FujmIVhDGGgfic5sACGr64C3zGMx0zXqk4c/eZxvuXc5O8knMz/dhFxf7BWRk+waHJ/smOIR7V6928jz6jbnHk8/N/TFK1x9SGp6QVXeB0ApHaLm4AacDgON+wBkvPDvoAZdgJ8w0sMccI3uQ+TZYau6IxAxPfLLJDuKLrfGx5g4kBW6BvoUhWEssIfydBUztTYBdW1GdqAcycwdc3U3wtF7n1F8xQPt/x+gZOpljvzXAqG82Q2K6HqyN1uJiylycTVuKQ/GLD/F//s/mTIH6yGeV6oPuQVYg6gFo6krH9St5uHohC9sjQkCWeWKicTA+tw7FWP0gvG0chEmGgRi1NQBSmr5Y6RKAb629QZY6covQckfIqDpCcJkDTH1cwTnlg+DMAARl+uNsJ91nxBl3u51wq8sB3xrYgMyzhNB3FpBbagmZJVaojNoI7FTD7dJ1mK61HWT2DmRHGgAdm7FwszG+0DDB3Z2bcbdC8xv+78Lwb0Cb4tEzNvaOnasP1le6+FZVCyfj5uJo/AJ8n7oU+6IXT+M/5s/mSu7auU+qNTladtZ4a3sInFMikVgag+dXMtHbnYBnl1KB66nwTQoBWeAIkVXOIAscoOnmBVyJwotTYSgt8Qc7yQt6nm6YouMA8q0tlu5wBAY8cb7THUtc/TDdLRTVZW64t9se2GeD1gJrSCy0gMJSC6gs3wHphRaI9d2MR5Xr0J+uhUnLt2PyKhPc3rkZRZG6GLloOy5U6uFhjca/PfGV4WcYMUNVZfTMTQdHzzGAwowtKPRYhDOJc3E+fSkOxy1q/TvucV7LV9v6on4DVllag8xzx5fmPiiujYaufwC2+fujrjESL64koKAsBNMMXGHL9sGNw2FDA5TzbLRVeqM0zxPnd/vi3gFvBEQ4Y8xaG5xocsW1PW7wiPFCZE4I5nqFwjbaC3trHXCrzQJdBeaYu9kMMvPNIPWdGWS+M0NdtA60DPRAppkiyHMbbtVsxJdqBujMMMCzOo10/roz/AmM/UpNYczXm+pYM42wXF0TZxJm40jsdxjMXYFDcYt38H/+r+B6kZrt8/qN0LaxxLuGvtym9SMDdwgtd4C6gxu+NnVDTysbGIzG3qYALNC3RWqqJ3KyvaC40pbr9VhrnKDl6o6LezzRWOiIuFh7POxzQkCKF9aHhqK3NRhTbENgkxqMM41WQJ8JvL1NIPC1CbaZbMM0dUOk+m+EwrfG+HytIa5VboCFpS6qE/Txok6jyu1PmJTB8AZGz9joLD1t66MAGzVcTpmL67nLcDh24W+a3vRnMFi0zgENGxAeZAQNV3d0tEdgcCAKkcm+sAzwwLX+EBxqD4TYfCuQb60hsdQO4ssdIbraBVO2ekBB2xNE1RtKm/3QVeOOq212GGyzw4lGe8x180dSQTCKG6IxMigbSQWeeNpuhPIEI0jNNsZnqgawtdqCzYa6EP7KCPXxm7h9wo60bXhat66ywE2dud32t/CR7rsjZurG53ssuXEhdf7tg5Hz/9T7wb/GpZxVppwDTgjNYYOl5YLt0XTGSjgyqiIQVBKL8poQhMS6Y6y2KyTU3CGi7gnDAF/cOhKIqopAkA10Kj0bytvZONHkiOd7rNBY6oAdYZ74yCUMp/eEQD0jA8uS0vB9gyW6M7ZCfq4h3l2qD82tuhD80gDhnptwu1obF8u34F71OhpsZjzf38201RsUdwXNUOF//e/g8fk0Vc6dlBtHB5LwnnUwyOYoGCZEwSs7CopeeejYE4WTbR5Q3uIHgfUB2N0QCJwP5IZdSiqC8LlTBIhuAub5hOFx5w486TRDa5ktdIJ98I1fJFraIjErqQD1FQ7oTt0Exdn6GDNPDyLT9OBhvwlo3YAbFVoYLF1ny183hv8nDPYGvs25GluD64lIqo7H+th4GGYlYWpMPt6NLcP5Q8Fgp/qAaIVDI4iN031BSClmQzUkBrFFEdgUEwNiloVtMSFAuyG+32kGm+QAqPjl4pvEAkxLLEJukSNKQ3VAPt0G1oytiPbeDOzajOsVWodPZKv96u0+hv8HPD/J3sg5F3oS1yJx72goftjri5KdbDS3BONipxsULWNAjOMha53AzWg1yTUJo93SsDomGV/RHdkdS5CS5w60bMHDel20lNnAK9UT30YmoqjIHk47tDFXTRc9mVvxtF7z/mDJes/8ECbIzPAKfRVukvf6/c2eHPY7SpvZ7/cEIqPAF3e6nTA/KBrENIebVpdYFaCsPgr2eUkg9mVgBRSD+FSC+NVgTlw6tqbFwCQjEq7ZoSgrtsMPO7fibKkublZq3XnRoBl1PHsNc2+X4ZehK+xu9Xmrcvrdi+/3uNzGYQ+c7fFDUikb5mnRWBKdhFlR6Xg3LA9KISWQCy3D6MhSvBdbjC8SC7EuKxMBZZForHXDQKkefijX6rlfo2X9oFJtDP+5GBjeyL3dDiN+2OWgxumxjuT0mu/idJleedRm8pwGmAfbrHG5zRoXmq1wudEU12q34V71htvPa9Yf4lSvzeVUr91+r3Ldh/w2GRj+bQZb3KRvN5m+/aDZePqzFr35j+s3LXu2U2fx01rtWU9qN/7rbou+Ev8xDAwMDAwMDAwMDAwMDP/D0Hl9+rwb6zMIIev43v+EEGLP9xqFrg35yd4fvxNDQshwAnKa4i2Yri8nhGzg+9yrSBFCfPhffAP8qeNoerZI3rloxlUnvvf/KDT1B71XzExU+I1QAXYSQuQIITSfMb3XSS+aJiGErm2dTQipIoSb95lus6VKCKFTkOhGfFQIwynPaAqM9TQlNO+f/w7vWLpwiG5hP5xL5j1CCE0SRLNGUbEPx92o7W5CCE1n0c97/ytCyBpCCM1wQOtEny/j1ZNCt3Cg56GhFHr+iYSQ8Ty79IdDX+/i+1HtJoToEEJm0rkVNDks7/UveP8Lap8WytuEELqv3fC2ssq870izK9Dv+CkhZDUh5F+EELoLFC30B2LEn/6D4c3QC9rI3Yt6CHpRXGneR554hve6oNuP0o2Y3XgehCYIojmQtekezzT7BSGE5o2hU7WOE0JodtCphBATQsg+Qsg2nk36nF5Eevzw3nF0S6tCui6KVx/qRQpo7iFCiAchJIt3rk28x9QrUy9M66HBE00i70djxTsfff0wIeTVpaQ0zW8AIUSP99kyQogDIYROqTfgnZOW4ce0jgd49cwjhLjz/ler6JYqhBC6Ec05QghdDUefr+B9D0aAvxH6j6IXloqPJu4Zy/sHU6iXo/9w2iyOJoTQbJ9UGHRlHG3GqLehwqEXZniHcHpBqC168SjUQ9Amnma5p9tWUWFTz0lFSwVDLxiFet4TPHFZ8LwIzcJgzBMXvajDufbo524QQujkgBCeF6YLgmi9tHilheeR+LPr0x8X9WK06adpeqmtH3helk6tp56TFvqjo89p7hn6nel3Gt7zI4Yn4hTe8+GtGCIIIeaEkGJGgL8d+o+iXoE2sXSSJZ1qT8XkyBPifEJIB88LUc/kwrvQ0bxCP0P7bNQDUs9ILzwVAG22KVSI9OJRMVGvs4gQ4s27uPQYKlAK/Zv/Sr1oU0y9GPVE9J5sNa+5pn0s+ph6Qip26gVreEKjiSupSCx5dab5pOt432kYKhb6g6IebwEhhCYR38zzpNt5dugPiv5YaN1p00+9G7WRzfsRUi9Pf0DDaUpoF0aEJ0j6OVo/RoC/g+H+D/UIdGBBvR29KMPbbNH+G32d9oWop6KbTdMZItTz0D4hhR5LRUFtUTHTppdCE0nSPt90nl06CKAXbwSvP0j7VRT6l39QQ/uQ9LO0qaT9LJoInV7oYdu0T0gFqc6rF/XItG60TvR81EPSftxwH45C+4n0u9F+IP0Ow+ekfUK6uQ79IdB+J4X28ahnpJ6X1nf4O9J+Lu0HD28jNvz/o/1dKlh6HAMDA8PvgwldMPxhaNM3vEUpbarC+N6nDPcFX4WGUX7vzpK0CaYjbwoNtdBR+r8DrTMdPDD8D0BFAN5jGiq5y+u30T4X7fjTPtrwqJWKkPYXaV+P9uFo5532uWiIg/bd6GiYjqBpbI2GQWgHn4p3GDqIoOeiQqehHTpip/1WOmql56C26XnpczrypX04KjQaAKcxQtofpfZpn2+438fwXw4VCc1YT0fPdLRLA7/0YlNB0LggHf3S16kQ6OiVdvzpaJiOXOmok4aC6Hs0ML6VF5Smf3t4oZmBV+6e0PAMFS3NRkrzFtKROw3XUIHRkSoVHh3Z0+d0ZEtH8NQjF/FGszRGSP/SOifzfQ+G/1JoLIwGdmnA2ZoXqqGZ6unrdPRJ43w0pENDHjQITKHBXiouKtbzvJEzfZ+GQjJ5oRYqLAo9nno+CvVaVFBUkI94YqJhIBrwpk0y9ao0JkfPR70qrQutB/WiNERD60iho2b6I2D4H4DGymi8joqJhj+oGGkckAa7aRNMY4i030abaho3o4LawxMpfY+KhsbzqFDoXRAaDKfB6OGAMhUkDTBT6B2X4WAwFRr1ovRcNM5HRUVjiX08gdNbajQ+ST0mFTYNlQwHlqmQmT3d/kegi9ZpTIwOKmgfjDalNB5HY2m0yPKERr2UJO+uA40B0hjf8IJ3Gi+kdyDoe/TWHO0DDscLaXM+nP2eHj88pZ7u1Dm8YSIdVNBbfVTo9I4N/SGc4h1HX6fvU/vDx1I7b9y8kOF/C3p/+e8I1lKvN3wvmXpRJszDwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwM//AVnb873G0TsSAAAAAElFTkSuQmCC";
+    const logoImg = new Image(); logoImg.src = LOGO_DATA_URI; logoImg.onload = () => drawSelfie();
+
+    function setWmTemplate(idx) {
+      wmTemplate = idx;
+      document.querySelectorAll("#tplChips button, #camTplChips button").forEach(b => {
+        b.classList.toggle("primary", Number(b.dataset.tpl) === idx);
+      });
+      drawSelfie(!!stream);
+    }
+
+    function showSelfieToast(msg) {
+      const el = document.getElementById("selfieToast");
+      if (!el) return;
+      el.textContent = msg; el.style.display = "block";
+      clearTimeout(el._t); el._t = setTimeout(() => { el.style.display = "none"; }, 3000);
+    }
+
+    function toggleWide() {
+      camWide = !camWide;
+      const b = document.getElementById("btnWide");
+      if (b) { b.textContent = camWide ? "Wide" : "1x"; b.style.background = camWide ? "var(--accent)" : "rgba(255,255,255,0.12)"; }
+      drawSelfie(!!stream);
+    }
+
+    async function startCamera() {
+      try {
+        if (stream) stream.getTracks().forEach(t => t.stop());
+        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: front ? "user" : "environment", width: { ideal: 1080 }, height: { ideal: 1920 }, aspectRatio: { ideal: 9 / 16 } }, audio: false });
+        const v = document.getElementById("cameraVideo");
+        v.srcObject = stream; await v.play();
+        document.getElementById("camModal").style.display = "flex";
+        requestAnimationFrame(camLoop);
+      } catch (_) { document.getElementById("fileIn").click(); }
+    }
+    function stopCamera() {
+      if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
+      document.getElementById("camModal").style.display = "none";
+      drawSelfie();
+    }
+    function flipCamera() { front = !front; startCamera(); }
+    function camLoop() { if (!stream) return; drawSelfie(true); requestAnimationFrame(camLoop); }
+    function snapCamera() {
+      const v = document.getElementById("cameraVideo"); if (!v.videoWidth) return;
+      const o = document.createElement("canvas"); o.width = v.videoWidth; o.height = v.videoHeight;
+      const ox = o.getContext("2d");
+      if (front) { ox.translate(o.width, 0); ox.scale(-1, 1); }
+      ox.drawImage(v, 0, 0);
+      const im = new Image();
+      im.onload = () => {
+        photoImg = im;
+        stopCamera();
+      };
+      im.src = o.toDataURL("image/jpeg", 0.95);
+    }
+    function onPhotoPick(e) {
+      const f = e.target.files?.[0]; if (!f) return;
+      const r = new FileReader();
+      r.onload = ev => {
+        const im = new Image();
+        im.onload = () => { photoImg = im; drawSelfie(); };
+        im.src = ev.target.result;
+      };
+      r.readAsDataURL(f);
+    }
+
+    function drawMiniRoute(ctx, rx, ry, rw, rh, strokeColor = "#FC4C02", glow = true) {
+      let minLon = Infinity, maxLon = -Infinity, minLat = Infinity, maxLat = -Infinity;
+      ROUTE_COORDS.forEach(([lon, lat]) => {
+        if (lon < minLon) minLon = lon; if (lon > maxLon) maxLon = lon;
+        if (lat < minLat) minLat = lat; if (lat > maxLat) maxLat = lat;
+      });
+      const pad = 6, spanLon = (maxLon - minLon) || 0.001, spanLat = (maxLat - minLat) || 0.001;
+      const sc = Math.min((rw - pad * 2) / spanLon, (rh - pad * 2) / spanLat);
+      const ox = rx + (rw - spanLon * sc) / 2, oy = ry + (rh - spanLat * sc) / 2;
+      ctx.save();
+      if (glow) { ctx.shadowColor = strokeColor; ctx.shadowBlur = 10; }
+      ctx.strokeStyle = strokeColor; ctx.lineWidth = 4.5; ctx.lineCap = "round"; ctx.lineJoin = "round";
+      ctx.beginPath();
+      ROUTE_COORDS.forEach(([lon, lat], i) => {
+        const px = ox + (lon - minLon) * sc;
+        const py = oy + (maxLat - lat) * sc;
+        if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+      });
+      ctx.stroke();
+      const [sLon, sLat] = ROUTE_COORDS[0];
+      ctx.fillStyle = "#FFFFFF";
+      ctx.beginPath(); ctx.arc(ox + (sLon - minLon) * sc, oy + (maxLat - sLat) * sc, 5, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+    }
+
+    function drawSelfie(live = false) {
+      const c = document.getElementById(live ? "camLiveCanvas" : "selfieCanvas");
+      if (!c) return;
+      const ctx = c.getContext("2d");
+      const W = c.width, H = c.height, v = document.getElementById("cameraVideo");
+      const isFrame = wmTemplate === 3;
+      const photoH = isFrame ? H - 290 : H;
+
+      ctx.fillStyle = isFrame ? "#F8FAFC" : "#111824";
+      ctx.fillRect(0, 0, W, H);
+
+      ctx.save();
+      if (isFrame) { ctx.beginPath(); ctx.rect(0, 0, W, photoH); ctx.clip(); }
+      if (live && v && v.videoWidth) {
+        ctx.save();
+        const s = camWide ? Math.min(W/v.videoWidth, photoH/v.videoHeight) : Math.max(W/v.videoWidth, photoH/v.videoHeight);
+        const dw = v.videoWidth*s, dh = v.videoHeight*s;
+        if (front) { ctx.translate(W, 0); ctx.scale(-1, 1); }
+        ctx.drawImage(v, (W-dw)/2, (photoH-dh)/2, dw, dh);
+        ctx.restore();
+      } else if (photoImg) {
+        const s = camWide ? Math.min(W/photoImg.width, photoH/photoImg.height) : Math.max(W/photoImg.width, photoH/photoImg.height);
+        const dw = photoImg.width*s, dh = photoImg.height*s;
+        ctx.drawImage(photoImg, (W-dw)/2, (photoH-dh)/2, dw, dh);
+      } else {
+        ctx.fillStyle = "#111824"; ctx.fillRect(0, 0, W, photoH);
+        ctx.fillStyle = "#94A3B8"; ctx.font = "500 26px Inter, sans-serif"; ctx.textAlign = "center";
+        ctx.fillText("Pilih atau ambil foto selfie Anda", W/2, photoH/2 - 20);
+      }
+      ctx.restore();
+
+      const km = progress > 0.02 ? progress * TOTAL_KM : TOTAL_KM;
+      const sec = elapsedSec > 10 ? elapsedSec : Math.round((km / TOTAL_KM) * 43 * 60);
+      const steps = Math.max(hwSteps, Math.round(km * 1315));
+      const nm = (document.getElementById("userName")?.value || "").trim();
+      const cols = [
+        ["Jarak", `${km.toFixed(2).replace(".",",")} km`],
+        ["Langkah", steps.toLocaleString("id-ID")],
+        ["Pace", `${fmtPace(sec, km)}/km`],
+        ["Waktu", fmtTime(sec)]
+      ];
+
+      ctx.save();
+      if (wmTemplate === 0) {
+        // Template 0: Glass + Mini Rute (Strava Classic)
+        const x = 44, y = H - 330, w = W - 88, h = 284;
+        ctx.fillStyle = "rgba(15, 20, 30, 0.72)";
+        ctx.beginPath(); ctx.roundRect(x, y, w, h, 26); ctx.fill();
+        ctx.strokeStyle = "rgba(255, 255, 255, 0.24)"; ctx.lineWidth = 2; ctx.stroke();
+
+        if (logoImg.complete && logoImg.naturalWidth) {
+          ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.roundRect(x+26, y+26, 62, 62, 14); ctx.fill();
+          ctx.drawImage(logoImg, x+30, y+30, 54, 54);
+        }
+        ctx.textAlign = "left";
+        ctx.fillStyle = "#E2A958"; ctx.font = "600 20px Inter, sans-serif";
+        ctx.fillText(nm ? `Fun Walk HUT OJK Ke-15 • ${nm}` : "Fun Walk HUT OJK Ke-15 • Yogyakarta", x+106, y+52);
+        ctx.fillStyle = "#FFFFFF"; ctx.font = "500 26px Inter, sans-serif";
+        ctx.fillText("Kantor OJK D.I. Yogyakarta", x+106, y+84);
+
+        drawMiniRoute(ctx, x + w - 156, y + 20, 130, 94, "#FC4C02", true);
+
+        const cw = (w - 52) / 4;
+        cols.forEach((it, idx) => {
+          const sx = x + 26 + idx * cw;
+          ctx.fillStyle = "#94A3B8"; ctx.font = "500 18px Inter, sans-serif"; ctx.fillText(it[0], sx, y + 165);
+          ctx.fillStyle = idx === 0 ? "#FC4C02" : "#FFFFFF"; ctx.font = "600 32px Inter, sans-serif"; ctx.fillText(it[1], sx, y + 210);
+        });
+        ctx.fillStyle = "rgba(255,255,255,0.65)"; ctx.font = "400 17px Inter, sans-serif";
+        ctx.fillText("Sabtu, 21 November 2026 • Tugu – Mangkubumi – Kotabaru – Sudirman", x+26, y+256);
+      } else if (wmTemplate === 1) {
+        // Template 1: Minimalis Transparan
+        const grad = ctx.createLinearGradient(0, H - 420, 0, H);
+        grad.addColorStop(0, "rgba(0,0,0,0)");
+        grad.addColorStop(1, "rgba(10,14,22,0.84)");
+        ctx.fillStyle = grad; ctx.fillRect(0, H - 420, W, 420);
+
+        drawMiniRoute(ctx, W - 210, H - 280, 160, 120, "#FC4C02", true);
+        if (logoImg.complete && logoImg.naturalWidth) {
+          ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.roundRect(48, H - 270, 56, 56, 12); ctx.fill();
+          ctx.drawImage(logoImg, 52, H - 266, 48, 48);
+        }
+        ctx.textAlign = "left";
+        ctx.fillStyle = "#FFFFFF"; ctx.font = "600 28px Inter, sans-serif";
+        ctx.fillText(nm ? `${nm} • Fun Walk OJK 15` : "Fun Walk HUT OJK Ke-15", 120, H - 234);
+        ctx.fillStyle = "rgba(255,255,255,0.75)"; ctx.font = "400 18px Inter, sans-serif";
+        ctx.fillText("Kantor OJK D.I. Yogyakarta • 21 Nov 2026", 120, H - 204);
+
+        const cw = (W - 96) / 4;
+        cols.forEach((it, idx) => {
+          const sx = 48 + idx * cw;
+          ctx.fillStyle = "rgba(255,255,255,0.65)"; ctx.font = "500 18px Inter, sans-serif"; ctx.fillText(it[0], sx, H - 125);
+          ctx.fillStyle = idx === 0 ? "#FC4C02" : "#FFFFFF"; ctx.font = "600 34px Inter, sans-serif"; ctx.fillText(it[1], sx, H - 80);
+        });
+      } else if (wmTemplate === 2) {
+        // Template 2: OJK Heritage (Top-Left Badge + Bottom-Right Route Card)
+        ctx.fillStyle = "rgba(15, 20, 30, 0.72)";
+        ctx.beginPath(); ctx.roundRect(40, 40, 440, 86, 20); ctx.fill();
+        if (logoImg.complete && logoImg.naturalWidth) {
+          ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.roundRect(54, 53, 60, 60, 12); ctx.fill();
+          ctx.drawImage(logoImg, 58, 57, 52, 52);
+        }
+        ctx.textAlign = "left";
+        ctx.fillStyle = "#E2A958"; ctx.font = "600 18px Inter, sans-serif";
+        ctx.fillText("HUT OJK KE-15 • DIY", 130, 78);
+        ctx.fillStyle = "#FFFFFF"; ctx.font = "500 21px Inter, sans-serif";
+        ctx.fillText(nm || "Fun Walk 3,10 KM", 130, 108);
+
+        const bx = W - 460, by = H - 250, bw = 420, bh = 210;
+        ctx.fillStyle = "rgba(15, 20, 30, 0.76)";
+        ctx.beginPath(); ctx.roundRect(bx, by, bw, bh, 22); ctx.fill();
+        ctx.strokeStyle = "rgba(255,255,255,0.22)"; ctx.lineWidth = 2; ctx.stroke();
+        drawMiniRoute(ctx, bx + 20, by + 24, 150, 110, "#FC4C02", true);
+        ctx.fillStyle = "#FC4C02"; ctx.font = "600 36px Inter, sans-serif";
+        ctx.fillText(`${km.toFixed(2).replace(".",",")} km`, bx + 190, by + 68);
+        ctx.fillStyle = "#FFFFFF"; ctx.font = "500 22px Inter, sans-serif";
+        ctx.fillText(`${steps.toLocaleString("id-ID")} langkah`, bx + 190, by + 106);
+        ctx.fillStyle = "#94A3B8"; ctx.font = "400 19px Inter, sans-serif";
+        ctx.fillText(`${fmtTime(sec)} • ${fmtPace(sec, km)}/km`, bx + 190, by + 140);
+        ctx.fillText("Tugu – Kotabaru – Sudirman", bx + 20, by + 182);
+      } else {
+        // Template 3: Bingkai Polaroid
+        const y = photoH;
+        if (logoImg.complete && logoImg.naturalWidth) {
+          ctx.drawImage(logoImg, 48, y + 32, 68, 68);
+        }
+        ctx.textAlign = "left";
+        ctx.fillStyle = "#0F172A"; ctx.font = "600 26px Inter, sans-serif";
+        ctx.fillText(nm ? `Fun Walk HUT OJK Ke-15 • ${nm}` : "Fun Walk HUT OJK Ke-15", 134, y + 62);
+        ctx.fillStyle = "#475569"; ctx.font = "400 19px Inter, sans-serif";
+        ctx.fillText("Kantor OJK D.I. Yogyakarta • 21 November 2026", 134, y + 94);
+
+        drawMiniRoute(ctx, W - 200, y + 24, 150, 96, "#FC4C02", false);
+
+        const cw = (W - 96) / 4;
+        cols.forEach((it, idx) => {
+          const sx = 48 + idx * cw;
+          ctx.fillStyle = "#64748B"; ctx.font = "500 17px Inter, sans-serif"; ctx.fillText(it[0], sx, y + 168);
+          ctx.fillStyle = idx === 0 ? "#FC4C02" : "#0F172A"; ctx.font = "600 32px Inter, sans-serif"; ctx.fillText(it[1], sx, y + 212);
+        });
+        ctx.fillStyle = "#94A3B8"; ctx.font = "400 16px Inter, sans-serif";
+        ctx.fillText("Tugu – Jl. Mangkubumi – Kotabaru – Jl. Jend. Sudirman", 48, y + 256);
+      }
+      ctx.restore();
+    }
+
+    function downloadSelfie() {
+      drawSelfie();
+      const a = document.createElement("a");
+      a.download = "Fun Walk HUT OJK Ke-15 DIY.png";
+      a.href = document.getElementById("selfieCanvas").toDataURL("image/png");
+      a.click();
+      showSelfieToast("Foto berhasil diunduh");
+    }
+    function shareSelfie() {
+      drawSelfie();
+      document.getElementById("selfieCanvas").toBlob(async b => {
+        if (!b) return;
+        const f = new File([b], "Fun Walk OJK 15.png", { type: "image/png" });
+        if (navigator.canShare && navigator.canShare({ files: [f] })) {
+          try { await navigator.share({ title: "Fun Walk HUT OJK Ke-15", files: [f] }); showSelfieToast("Foto dibagikan"); return; } catch (_) {}
+        }
+        downloadSelfie();
+      }, "image/png");
+    }
+
+    // Confetti & Fallback
+    function launchConfetti() {
+      const c = document.getElementById("confettiCanvas");
+      c.width = window.innerWidth; c.height = window.innerHeight;
+      const ctx = c.getContext("2d");
+      const cols = ["#FC4C02", "#E2A958", "#BA1313", "#FFFFFF"];
+      const ps = Array.from({length: 70}, () => ({ x: Math.random()*c.width, y: -20, vx: (Math.random()-0.5)*4, vy: 3+Math.random()*4, s: 6+Math.random()*5, col: cols[Math.floor(Math.random()*cols.length)] }));
+      let f = 0;
+      (function step() {
+        ctx.clearRect(0, 0, c.width, c.height);
+        for (const p of ps) { p.x += p.vx; p.y += p.vy; ctx.fillStyle = p.col; ctx.fillRect(p.x, p.y, p.s, p.s*0.6); }
+        if (++f < 130) requestAnimationFrame(step); else ctx.clearRect(0, 0, c.width, c.height);
+      })();
+    }
+
+    function startFallback() {
+      if (fallback) return; fallback = true;
+      const c = document.getElementById("fallbackCanvas"); c.style.display = "block";
+      const ctx = c.getContext("2d");
+      (function draw() {
+        const w = c.width = c.parentElement.clientWidth, h = c.height = c.parentElement.clientHeight;
+        ctx.fillStyle = "#0F141E"; ctx.fillRect(0, 0, w, h);
+        const toXY = ([lng, lat]) => [w*0.5 + (lng-110.3706)*(Math.min(w,h)*72), h*0.45 - (lat+7.7864)*(Math.min(w,h)*72)];
+        ctx.beginPath(); ROUTE_COORDS.forEach((p, i) => { const [x,y] = toXY(p); i===0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y); });
+        ctx.strokeStyle = "#FC4C02"; ctx.lineWidth = 5; ctx.lineCap = "round"; ctx.lineJoin = "round"; ctx.stroke();
+        const [ux, uy] = toXY([curCoord.lng, curCoord.lat]);
+        ctx.beginPath(); ctx.arc(ux, uy, 8, 0, Math.PI*2); ctx.fillStyle = "#0EA5E9"; ctx.fill(); ctx.strokeStyle = "#fff"; ctx.lineWidth = 2; ctx.stroke();
+        requestAnimationFrame(draw);
+      })();
+    }
+
+    let last = performance.now();
+    (function tick(now) {
+      const dt = Math.min(0.05, (now - last) * 0.001); last = now;
+      if (simOn) {
+        progress += dt * 0.045; elapsedSec = progress * 43 * 60;
+        if (progress >= 1) { progress = 1; simOn = false; updateSimBtn(); }
+        syncUI();
+      } else if (gpsOn) {
+        elapsedSec += dt; syncUI();
+      }
+      requestAnimationFrame(tick);
+    })(performance.now());
+
+    initMap();
+  </script>
+</body>
+</html>
