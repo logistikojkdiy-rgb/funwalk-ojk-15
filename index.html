@@ -427,11 +427,12 @@
             </div>
             <input type="file" id="camIn" accept="image/*" capture="user" style="display:none" onchange="onPhotoPick(event)" />
             <input type="file" id="fileIn" accept="image/*" style="display:none" onchange="onPhotoPick(event)" />
-            <div style="display:flex;gap:6px;overflow-x:auto;padding:2px 0;" id="tplChips">
-              <button class="btn-pill primary" data-tpl="0" onclick="setWmTemplate(0)" style="flex:0 0 auto;padding:7px 12px;font-size:12px;">Glass + Rute</button>
-              <button class="btn-pill" data-tpl="1" onclick="setWmTemplate(1)" style="flex:0 0 auto;padding:7px 12px;font-size:12px;">Minimalis</button>
-              <button class="btn-pill" data-tpl="2" onclick="setWmTemplate(2)" style="flex:0 0 auto;padding:7px 12px;font-size:12px;">OJK Heritage</button>
-              <button class="btn-pill" data-tpl="3" onclick="setWmTemplate(3)" style="flex:0 0 auto;padding:7px 12px;font-size:12px;">Bingkai</button>
+            <div style="font-size:11.5px;color:var(--muted);margin-top:2px;">Pilihan Template Watermark Fun Walk</div>
+            <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;" id="tplChips">
+              <button class="btn-pill primary" data-tpl="0" onclick="setWmTemplate(0)" style="padding:7px 4px;font-size:11px;white-space:nowrap;">Glass+Rute</button>
+              <button class="btn-pill" data-tpl="1" onclick="setWmTemplate(1)" style="padding:7px 4px;font-size:11px;white-space:nowrap;">Minimalis</button>
+              <button class="btn-pill" data-tpl="2" onclick="setWmTemplate(2)" style="padding:7px 4px;font-size:11px;white-space:nowrap;">Heritage</button>
+              <button class="btn-pill" data-tpl="3" onclick="setWmTemplate(3)" style="padding:7px 4px;font-size:11px;white-space:nowrap;">Bingkai</button>
             </div>
             <input type="text" id="userName" class="input-clean" placeholder="Nama Anda (opsional)" oninput="drawSelfie()" />
             <div class="selfie-frame">
@@ -489,10 +490,9 @@
       [110.366572, -7.787300], [110.366414, -7.788600], [110.366257, -7.789822],
       [110.366755, -7.789926], [110.367542, -7.790004], [110.368408, -7.790056],
       [110.368932, -7.790030], [110.369378, -7.789926], [110.369903, -7.789770],
-      [110.370506, -7.789432], [110.371214, -7.788964], [110.372001, -7.788470],
-      [110.372657, -7.788080], [110.373182, -7.787794], [110.373520, -7.787660],
-      [110.373560, -7.787118], [110.373820, -7.786910], [110.374178, -7.786850],
-      [110.374650, -7.786750], [110.374782, -7.785870], [110.374913, -7.785220],
+      [110.370506, -7.789432], [110.371214, -7.788964], [110.371780, -7.788520],
+      [110.371850, -7.787500], [110.371920, -7.786750], [110.372800, -7.786680],
+      [110.373800, -7.786550], [110.374650, -7.786750], [110.374782, -7.785870], [110.374913, -7.785220],
       [110.375044, -7.784310], [110.375175, -7.783530], [110.375280, -7.782932],
       [110.374231, -7.782932], [110.373182, -7.782932], [110.372132, -7.782958],
       [110.370952, -7.782932], [110.369772, -7.782932], [110.368827, -7.782932]
@@ -503,7 +503,7 @@
       { id: "1", code: "1", km: 0.20, lng: 110.367070, lat: -7.782880, name: "Tugu Yogyakarta", sub: "Belok kiri ke selatan menuju Jl. Mangkubumi" },
       { id: "2", code: "2", km: 0.56, lng: 110.366703, lat: -7.786130, name: "Jl. P. Mangkubumi No. 36", sub: "Koridor Mangkubumi menuju Margo Utomo" },
       { id: "3", code: "3", km: 0.98, lng: 110.366257, lat: -7.789822, name: "Jl. Margo Utomo No. 3b", sub: "Belok kiri ke timur melewati Jembatan Kleringan" },
-      { id: "4", code: "4", km: 1.85, lng: 110.373560, lat: -7.787118, name: "Kawasan Kotabaru", sub: "Jl. Abu Bakar Ali – Kolsani – Jl. Yos Sudarso" },
+      { id: "4", code: "4", km: 1.85, lng: 110.373560, lat: -7.787118, name: "Kawasan Kotabaru", sub: "Jl. Abu Bakar Ali – Jl. Ngadikan – Jl. F.M. Noto" },
       { id: "5", code: "5", km: 2.42, lng: 110.375280, lat: -7.782932, name: "Perempatan Gramedia", sub: "Belok kiri ke barat lurus menuju Kantor OJK" },
       { id: "F", code: "F", km: 3.10, lng: 110.368827, lat: -7.782932, name: "Finish Kantor OJK DIY", sub: "Selesai 3,10 km • Ambil Foto Selfie Finisher" }
     ];
